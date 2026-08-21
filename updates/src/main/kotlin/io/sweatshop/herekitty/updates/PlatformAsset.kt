@@ -12,8 +12,17 @@ import io.sweatshop.herekitty.domain.features.updates.model.ReleaseAsset
  */
 object PlatformAsset {
 
-    fun forThisMachine(assets: List<ReleaseAsset>): ReleaseAsset? =
+    /** What a person would download and install by hand. */
+    fun installerForThisMachine(assets: List<ReleaseAsset>): ReleaseAsset? =
         select(assets, currentKind, currentArchitecture)
+
+    /**
+     * What the updater should fetch, which on macOS is not what a person downloads: replacing the app
+     * in place needs the bundle, so the zip is preferred and the disk image is the fallback.
+     */
+    fun updatePayloadForThisMachine(assets: List<ReleaseAsset>): ReleaseAsset? =
+        select(assets, currentUpdateKind, currentArchitecture)
+            ?: select(assets, currentKind, currentArchitecture)
 
     internal fun select(
         assets: List<ReleaseAsset>,
@@ -36,6 +45,9 @@ object PlatformAsset {
                 else -> InstallerKind.Deb
             }
         }
+
+    internal val currentUpdateKind: InstallerKind
+        get() = if (currentKind == InstallerKind.Dmg) InstallerKind.Zip else currentKind
 
     internal val currentArchitecture: String
         get() = when (System.getProperty("os.arch").orEmpty().lowercase()) {

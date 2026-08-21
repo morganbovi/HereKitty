@@ -80,6 +80,19 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           cp "$found" "release/HereKitty-${version}-${{ matrix.label }}.${{ matrix.extension }}"
 
+      # The updater replaces the installed bundle, so it needs the bundle — not a disk image it would
+      # have to mount, copy out of, and unmount. `ditto` rather than `zip` because it is the only one
+      # that preserves an .app's symlinks and permission bits intact.
+      - name: Archive the app bundle for the updater
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          ditto -c -k --sequesterRsrc --keepParent \
+            desktopApp/build/compose/binaries/main/app/HereKitty.app \
+            "release/HereKitty-${version}-${{ matrix.label }}.zip"
+
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.label }}

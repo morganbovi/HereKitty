@@ -14,6 +14,7 @@ class PlatformAssetTest {
 
     private val release = listOf(
         asset("HereKitty-1.1.0-macos-arm64.dmg"),
+        asset("HereKitty-1.1.0-macos-arm64.zip"),
         asset("HereKitty-1.1.0-macos-x64.dmg"),
         asset("HereKitty-1.1.0-windows-x64.msi"),
         asset("HereKitty-1.1.0-linux-x64.deb"),
@@ -75,7 +76,7 @@ class PlatformAssetTest {
      */
     @Test
     fun `this machine picks the asset matching its own installer kind`() {
-        val picked = PlatformAsset.forThisMachine(release)
+        val picked = PlatformAsset.installerForThisMachine(release)
 
         assertNotNull(picked, "a release carrying every platform should serve this one")
         assertTrue(
@@ -83,5 +84,28 @@ class PlatformAssetTest {
             "picked ${picked.name} for ${PlatformAsset.currentKind}",
         )
         assertTrue(picked.name.contains(PlatformAsset.currentArchitecture), "picked ${picked.name}")
+    }
+
+    /** A person gets the disk image; the updater gets the bundle it can actually swap. */
+    @Test
+    fun `the updater prefers the archived bundle over the disk image`() {
+        val installer = PlatformAsset.installerForThisMachine(release)
+        val payload = PlatformAsset.updatePayloadForThisMachine(release)
+
+        assertNotNull(installer)
+        assertNotNull(payload)
+        assertTrue(installer.name.endsWith(".${PlatformAsset.currentKind.extension}"), installer.name)
+        assertTrue(payload.name.endsWith(".${PlatformAsset.currentUpdateKind.extension}"), payload.name)
+    }
+
+    /** A release published before zips were added must still be updatable, not silently skipped. */
+    @Test
+    fun `the updater falls back to the installer when no archive was published`() {
+        val noZip = release.filterNot { it.name.endsWith(".zip") }
+
+        assertEquals(
+            PlatformAsset.installerForThisMachine(noZip)?.name,
+            PlatformAsset.updatePayloadForThisMachine(noZip)?.name,
+        )
     }
 }

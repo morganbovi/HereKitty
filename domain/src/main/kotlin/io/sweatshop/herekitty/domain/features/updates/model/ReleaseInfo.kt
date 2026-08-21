@@ -15,9 +15,18 @@ data class ReleaseInfo(
 
 data class ReleaseAsset(val name: String, val downloadUrl: String, val sizeBytes: Long)
 
-/** The installer kinds jpackage produces, and so the ones a release can carry. */
+/**
+ * What a release can carry.
+ *
+ * [Zip] is not something jpackage produces — it is the app bundle archived alongside the `.dmg`,
+ * because replacing an installed app in place needs the bundle itself. Unpacking a zip is one step;
+ * getting a bundle out of a disk image means mounting it, copying, and unmounting, with a mount point
+ * to leak if anything fails in between. It is the same split Sparkle makes: disk images for people,
+ * archives for updaters.
+ */
 enum class InstallerKind(val extension: String) {
     Dmg("dmg"),
+    Zip("zip"),
     Msi("msi"),
     Deb("deb"),
 }
