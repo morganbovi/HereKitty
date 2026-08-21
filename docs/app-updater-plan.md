@@ -101,6 +101,14 @@ git switch main && git merge feature/auto-update
 git tag v1.1.0 && git push origin main --tags
 ```
 
+**Tags need a non-zero major.** jpackage refuses a version whose first number is zero, so `v0.x`
+cannot be packaged for macOS at all — rehearse with `v1.0.1-rc1`, not `v0.0.1-rc1`. The build says so
+rather than letting jpackage fail with advice about `app-version`.
+
+**A pre-release suffix is stripped for the installer only.** `packageVersion` must be
+`MAJOR[.MINOR][.PATCH]`, and an `.msi` needs all three, so `1.0.1-rc1` records `1.0.1` in the bundle
+while the app reports `1.0.1-rc1` — which is the version the updater compares against the tag.
+
 **The tag is the version.** CI builds with `-Pversion=<tag minus the v>`, so the artifact name, the
 version the app reports, and the release all agree by construction. `version` in `gradle.properties`
 is only the default for a local build, and does not need bumping to cut a release.
