@@ -7,6 +7,8 @@ plugins {
 dependencies {
     implementation(project(":domain"))
     implementation(project(":adb"))
+    implementation(project(":net"))
+    implementation(project(":updates"))
     implementation(libs.kotlinx.serializationJson)
 
     testImplementation(libs.kotlin.test)
