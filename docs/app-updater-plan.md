@@ -92,6 +92,22 @@ The workflow's YAML parses, but nothing in it has run on a real runner yet.
    that already happened.
 3. **CI on a tag**, publishing a `.dmg` for people and a `ditto` archive for the updater.
 
+## Releasing
+
+Merge to `main`, then tag `main`:
+
+```bash
+git switch main && git merge feature/auto-update
+git tag v1.1.0 && git push origin main --tags
+```
+
+**The tag is the version.** CI builds with `-Pversion=<tag minus the v>`, so the artifact name, the
+version the app reports, and the release all agree by construction. `version` in `gradle.properties`
+is only the default for a local build, and does not need bumping to cut a release.
+
+Publishing waits on the `release` environment, so approval is the last gate before anything is
+public. A `workflow_dispatch` run rehearses all of it and produces a draft instead.
+
 ## What is not covered
 
 - **Windows and Linux cannot update in place.** `installedBundle()` finds nothing outside a macOS

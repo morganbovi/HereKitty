@@ -73,7 +73,17 @@ jobs:
       - if: runner.os == 'Windows'
         run: choco install wixtoolset --version 3.11.2 --no-progress -y
 
-      - run: ./gradlew ${{ matrix.task }} --stacktrace
+      # The tag is the version. gradle.properties only supplies a default for local builds, so
+      # without this the artifact would be named after the tag and report whatever was committed --
+      # and the updater compares its own version against the tag, so a drift there means it either
+      # never sees an update or always sees one.
+      - shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          version="${INPUT_VERSION:-${GITHUB_REF_NAME#v}}"
+          ./gradlew ${{ matrix.task }} -Pversion="$version" --stacktrace
 
       # The build succeeding says nothing about the image being runnable — see verifyDistributable.
       - run: ./gradlew :desktopApp:verifyDistributable
