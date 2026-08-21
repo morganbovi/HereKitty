@@ -6,16 +6,16 @@ on:
     tags: ['v*']
   pull_request:
   # So the whole pipeline can be exercised without cutting a real release. A dispatched run always
-  # produces a draft, and can be limited to macOS while the other two runners are still unproven.
+  # produces a draft.
   workflow_dispatch:
     inputs:
       version:
         description: Version to stamp the artifacts with
         default: 0.0.0-test
-      macos_only:
-        description: Skip the Windows and Linux runners
+      all_platforms:
+        description: Also build Windows and Linux, which have never succeeded
         type: boolean
-        default: true
+        default: false
 
 permissions:
   contents: read
@@ -48,14 +48,17 @@ jobs:
       fail-fast: false
       # Chosen rather than filtered: the matrix context is not available to a job-level `if`, so a
       # rehearsal picks a smaller matrix instead of skipping entries.
+      # macOS alone by default: it is the only platform that has ever packaged successfully, and the
+      # release job needs every entry, so including an unproven runner means no release at all rather
+      # than a partial one. Windows and Linux are opt-in until they work.
       matrix:
         include: >-
-          ${{ fromJSON(inputs.macos_only && '[
-            {"os":"macos-14","task":"packageDmg","extension":"dmg","label":"macos-arm64"}
-          ]' || '[
+          ${{ fromJSON(inputs.all_platforms && '[
             {"os":"macos-14","task":"packageDmg","extension":"dmg","label":"macos-arm64"},
             {"os":"ubuntu-latest","task":"packageDeb","extension":"deb","label":"linux-x64"},
             {"os":"windows-latest","task":"packageMsi","extension":"msi","label":"windows-x64"}
+          ]' || '[
+            {"os":"macos-14","task":"packageDmg","extension":"dmg","label":"macos-arm64"}
           ]') }}
     runs-on: ${{ matrix.os }}
     steps:
