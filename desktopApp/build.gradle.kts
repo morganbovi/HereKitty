@@ -39,7 +39,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "HereKitty"
-            packageVersion = "1.0.0"
+            packageVersion = project.version.toString()
 
             // jpackage jlinks a minimal runtime, and these three are outside its default set. Without
             // jdk.unsupported the packaged app dies at first paint on Jewel's use of sun.misc.Unsafe —
