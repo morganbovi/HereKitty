@@ -24,17 +24,17 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The JetBrains Runtime, not just any JDK 25: Jewel's DecoratedWindow calls error() outright
       # when JBR.isAvailable() is false. Installing it here also saves Gradle provisioning it, which
       # is a ~350 MB download on a cold cache.
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: jetbrains
           java-version: '25'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       # Neither the live-adb nor the network tests run: no device, and no reason to hit Google.
       - run: ./gradlew build --stacktrace
@@ -59,14 +59,14 @@ jobs:
           ]') }}
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: jetbrains
           java-version: '25'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       # jpackage shells out to WiX for an .msi and fails without it. WiX 3.11 rather than 4/5 because
       # it is the version jpackage has supported longest.
@@ -116,7 +116,7 @@ jobs:
             desktopApp/build/compose/binaries/main/app/HereKitty.app \
             "release/HereKitty-${version}-${{ matrix.label }}.zip"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.label }}
           path: release/*
@@ -131,7 +131,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
