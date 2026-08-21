@@ -406,8 +406,6 @@ tested; they are listed so they can be revisited as choices rather than assumed 
 
 ## Still open
 
-- **An in-app updater over GitHub Releases** is planned but unbuilt; see `docs/app-updater-plan.md`
-  for the constraints that shape it and the three decisions still outstanding.
 
 - **Cross-pane connectors.** Timestamp-synced scrolling with IntelliJ-merge-style lines between panes.
   Shape agreed; the pairing rule — connect only within a time window, or always to the next line — was
@@ -419,3 +417,33 @@ tested; they are listed so they can be revisited as choices rather than assumed 
 - **Dialog title bars are the platform's.** Jewel has no decorated *dialog*, only a decorated window.
 - **A pane move loses its scroll position.** `rememberLazyListState` is local to the pane, so dragging
   one to a different split resets it. Invisible while following the tail.
+
+## Updating itself (`:updates`, `:net`)
+
+`:net` is shared plumbing — `HttpFetch` and `Checksums` — used by both the updater and the
+platform-tools installer, which needed the same download-with-progress. `:updates` is the data source
+for GitHub releases, the analogue of `:adb`: wire format, no state. State lives in
+`:repository/updates`, and `docs/app-updater-plan.md` records why the pieces are shaped as they are.
+
+- **`HttpURLConnection`, never `java.net.http`.** `HttpClient` is not in the runtime image jpackage
+  builds, so anything using it works under `run` and dies in the packaged app. This is the third thing
+  in this project to have that shape; `HttpFetch`'s doc comment says so at the point of temptation.
+- **A release carries a `ditto` archive as well as a disk image.** Replacing an installed app needs the
+  bundle, and getting one out of a disk image means mounting, copying and unmounting, with a mount
+  point to leak on failure. Same split Sparkle makes: images for people, archives for updaters. `ditto`
+  and not `java.util.zip`, which loses a bundle's symlinks and permission bits.
+- **Nothing unverified is ever installed.** Applying an update replaces the running application, so a
+  release published without `SHA256SUMS` is treated as unverifiable rather than trusted. That catches a
+  corrupted or substituted download, not a bad release — the checksums travel with the payload, and
+  only a signed app would give that.
+- **The swap outlives the app.** A detached `/bin/sh` helper waits on this process's id, moves the old
+  bundle aside, and puts it back if the replacement fails — so a failure leaves the previous version
+  rather than nothing. `applyAndRestart` reports whether the helper started and leaves quitting to the
+  window, because `exitApplication` belongs there.
+- **A 404 means "nothing published yet", not a failure.** Until the first release that is the honest
+  answer, and a launch that finds nothing says nothing: only an available update, or a check someone
+  asked for, puts a balloon on screen (`UpdateUiModel.isWorthShowing`).
+- **Decisions live in pure functions.** `UpdateCheck.outcomeOf` takes an already-resolved asset so it
+  does not depend on the machine it runs on, which is also what lets every case be tested on the Linux
+  CI runner. It refuses a release equal to or older than the running one, because an update must never
+  offer a downgrade.

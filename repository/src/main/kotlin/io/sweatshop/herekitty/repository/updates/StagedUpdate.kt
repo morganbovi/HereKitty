@@ -21,13 +21,24 @@ internal object StagedUpdate {
      * which is the case under `gradlew run`, where there is no bundle to replace.
      */
     fun installedBundle(): Path? {
+        // jpackage sets the first; the second is the same path by another route, for a launcher that
+        // does not.
         val launcher = System.getProperty("jpackage.app-path")
             ?: ProcessHandle.current().info().command().orElse(null)
             ?: return null
 
-        // .../HereKitty.app/Contents/MacOS/HereKitty — the bundle is three levels up.
-        val bundle = Path.of(launcher).parent?.parent?.parent ?: return null
-        return bundle.takeIf { it.name.endsWith(".app") && Files.isDirectory(it) }
+        return bundleFrom(launcher)?.takeIf { Files.isDirectory(it) }
+    }
+
+    /**
+     * The `.app` containing a launcher at `<bundle>/Contents/MacOS/<name>`, or null for a path that is
+     * not inside one — which is every path under `gradlew run`, where the launcher is a bare JVM.
+     */
+    internal fun bundleFrom(launcherPath: String): Path? {
+        val launcher = Path.of(launcherPath)
+        if (launcher.parent?.name != "MacOS" || launcher.parent?.parent?.name != "Contents") return null
+
+        return launcher.parent?.parent?.parent?.takeIf { it.name.endsWith(".app") }
     }
 
     /**

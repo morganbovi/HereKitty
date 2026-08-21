@@ -1,6 +1,8 @@
-# Plan: in-app updater over GitHub Releases
+# The in-app updater over GitHub Releases
 
-Nothing here is built yet. Three decisions are still open — see the end.
+**Built.** This was the plan; it is kept because the constraints it records are still the reasons the
+code looks the way it does. The decisions at the end were settled: the update is applied **in place**,
+surfaced as a **corner balloon**, and published by **CI on a tag**.
 
 ## What makes this project's version of the problem specific
 
@@ -77,16 +79,24 @@ to come from one place before a release is trustworthy.
 
 The workflow's YAML parses, but nothing in it has run on a real runner yet.
 
-## Decisions still open
+## Decisions, as settled
 
-1. **How the update is applied.** Recommended: download the `.dmg`, verify it, mount it, reveal it in
-   Finder, and let the user drag across — roughly a day, and nothing can half-replace a running
-   bundle. The alternative, replacing the bundle in place and relaunching, needs a detached helper
-   that waits for exit, write access to the install location, and accepts that an unsigned app
-   silently overwriting itself looks exactly like malware. Its failure mode is a broken install.
-2. **Where it surfaces.** Recommended: the corner balloon, optionally also a title-bar button so it
-   survives the balloon being dismissed.
-3. **How artifacts get published.** By hand (`packageDmg` plus a checksum file, uploaded to a release)
-   keeps this scoped to the updater. A GitHub Actions workflow is nicer but jpackage cannot
-   cross-build, so covering all three formats means three runner jobs. Note only the `.dmg` has ever
-   actually been built.
+1. **In place, with a restart.** A detached shell helper waits for this process to exit, swaps the
+   bundle and relaunches. It moves the old bundle aside first and puts it back if the replacement
+   fails, so a failed swap leaves the previous version installed rather than nothing. The residual
+   risk is accepted knowingly: the app is unsigned, so a checksum is the only thing between a bad
+   download and code execution, and a checksum published beside the payload cannot detect a bad
+   release. Signing is what would upgrade that, and the helper does not change if it is added.
+2. **A corner balloon**, in the same stack as the notices but deliberately not the same type — it has
+   buttons and a lifetime tied to an operation, where a notification is a message about something
+   that already happened.
+3. **CI on a tag**, publishing a `.dmg` for people and a `ditto` archive for the updater.
+
+## What is not covered
+
+- **Windows and Linux cannot update in place.** `installedBundle()` finds nothing outside a macOS
+  bundle and the offer says so, rather than half-working.
+- **Nothing is signed**, so a browser download is still quarantined and still needs *Open Anyway*. An
+  update fetched in-app is not, because the quarantine flag comes from browsers.
+- **The release workflow has never run.** Its YAML parses and `verifyDistributable` guards the image,
+  but no tag has been pushed.
