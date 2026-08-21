@@ -5,6 +5,7 @@ plugins {
 
 dependencies {
     implementation(project(":domain"))
+    implementation(project(":net"))
 
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.testJunit)

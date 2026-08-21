@@ -1,9 +1,8 @@
 package io.sweatshop.herekitty.adb
 
 import io.sweatshop.herekitty.domain.base.Log
+import io.sweatshop.herekitty.net.HttpFetch
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.zip.ZipInputStream
@@ -32,7 +31,7 @@ class PlatformToolsInstaller {
         withContext(Dispatchers.IO) {
             val archive = Files.createTempFile("herekitty-platform-tools", ".zip")
             try {
-                download(archive, onProgress)
+                HttpFetch.toFile(downloadUrl, archive, onProgress)
                 onProgress(null)
                 extractInto(archive, root.toPath())
             } finally {
@@ -44,37 +43,6 @@ class PlatformToolsInstaller {
                 Log.i { "Installed adb at $it" }
             }
         }
-
-    private fun download(target: Path, onProgress: (Float?) -> Unit) {
-        val connection = (URI(downloadUrl).toURL().openConnection() as HttpURLConnection).apply {
-            instanceFollowRedirects = true
-            connectTimeout = CONNECT_TIMEOUT_MILLIS
-            readTimeout = READ_TIMEOUT_MILLIS
-        }
-
-        try {
-            check(connection.responseCode == HttpURLConnection.HTTP_OK) {
-                "$downloadUrl answered ${connection.responseCode}"
-            }
-
-            val expected = connection.contentLengthLong.takeIf { it > 0 }
-            connection.inputStream.use { source ->
-                Files.newOutputStream(target).use { sink ->
-                    val buffer = ByteArray(BUFFER_BYTES)
-                    var received = 0L
-                    while (true) {
-                        val read = source.read(buffer)
-                        if (read < 0) break
-                        sink.write(buffer, 0, read)
-                        received += read
-                        onProgress(expected?.let { received.toFloat() / it })
-                    }
-                }
-            }
-        } finally {
-            connection.disconnect()
-        }
-    }
 
     private fun extractInto(archive: Path, target: Path) {
         Files.createDirectories(target)
@@ -116,10 +84,4 @@ class PlatformToolsInstaller {
                 else -> "linux"
             }
         }
-
-    private companion object {
-        const val CONNECT_TIMEOUT_MILLIS = 15_000
-        const val READ_TIMEOUT_MILLIS = 30_000
-        const val BUFFER_BYTES = 1 shl 16
-    }
 }
