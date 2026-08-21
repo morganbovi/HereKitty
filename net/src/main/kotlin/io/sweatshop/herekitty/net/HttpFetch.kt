@@ -15,6 +15,9 @@ import kotlinx.coroutines.withContext
  * `./gradlew run` and throws `NoClassDefFoundError` in the packaged app. `HttpURLConnection` lives in
  * `java.base`, which is always there.
  */
+/** Carries the status so a caller can tell "nothing published" from "could not reach it". */
+class HttpStatusException(val code: Int, url: String) : RuntimeException("$url answered $code")
+
 object HttpFetch {
 
     suspend fun text(url: String): String = withContext(Dispatchers.IO) {
@@ -57,7 +60,7 @@ object HttpFetch {
         }
         if (code != HttpURLConnection.HTTP_OK) {
             connection.disconnect()
-            error("$url answered $code")
+            throw HttpStatusException(code, url)
         }
         return Connection(connection)
     }

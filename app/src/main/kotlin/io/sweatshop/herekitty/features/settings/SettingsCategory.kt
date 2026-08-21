@@ -8,4 +8,5 @@ enum class SettingsCategory(val title: String, val icon: IconKey) {
     LogDisplay("Log display", AllIconsKeys.General.Layout),
     Recording("Recording", AllIconsKeys.Actions.GC),
     Prompts("Prompts", AllIconsKeys.General.BalloonInformation),
+    Updates("Updates", AllIconsKeys.Actions.Refresh),
 }

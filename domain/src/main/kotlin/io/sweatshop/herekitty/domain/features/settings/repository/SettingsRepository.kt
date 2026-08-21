@@ -21,6 +21,9 @@ interface SettingsRepository {
     /** Whether quitting asks first. */
     val confirmExit: StateFlow<Boolean>
 
+    /** Whether launching asks GitHub whether there is a newer release. */
+    val checkForUpdatesOnStartup: StateFlow<Boolean>
+
     /** How long a notification waits before dismissing itself. Zero means it waits for you. */
     val notificationDismissSeconds: StateFlow<Int>
 
@@ -37,6 +40,8 @@ interface SettingsRepository {
     fun setConfirmSessionClose(confirm: Boolean)
 
     fun setConfirmExit(confirm: Boolean)
+
+    fun setCheckForUpdatesOnStartup(check: Boolean)
 
     fun setNotificationDismissSeconds(seconds: Int)
 

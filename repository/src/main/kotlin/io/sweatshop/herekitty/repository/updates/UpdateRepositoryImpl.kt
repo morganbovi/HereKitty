@@ -2,6 +2,7 @@ package io.sweatshop.herekitty.repository.updates
 
 import io.sweatshop.herekitty.domain.base.Log
 import io.sweatshop.herekitty.domain.features.updates.model.AppVersion
+import io.sweatshop.herekitty.domain.features.updates.model.LatestRelease
 import io.sweatshop.herekitty.domain.features.updates.model.ReleaseInfo
 import io.sweatshop.herekitty.domain.features.updates.model.UpdateState
 import io.sweatshop.herekitty.domain.features.updates.repository.UpdateRepository
@@ -35,9 +36,10 @@ class UpdateRepositoryImpl(private val source: GithubReleaseSource) : UpdateRepo
 
         _state.value = UpdateState.Checking
 
-        val release = source.latest()
-        val payload = release?.let { PlatformAsset.updatePayloadForThisMachine(it.assets) }
-        _state.value = UpdateCheck.outcomeOf(AppVersion.Current, release, payload)
+        val latest = source.latest()
+        val payload = (latest as? LatestRelease.Found)
+            ?.let { PlatformAsset.updatePayloadForThisMachine(it.release.assets) }
+        _state.value = UpdateCheck.outcomeOf(AppVersion.Current, latest, payload)
     }
 
     override suspend fun download(release: ReleaseInfo) {
@@ -61,8 +63,10 @@ class UpdateRepositoryImpl(private val source: GithubReleaseSource) : UpdateRepo
 
             verify(release, payload.name, target)
 
-            _state.value = UpdateState.ReadyToInstall(release, target.toString())
-            Log.i { "Staged ${release.version} at $target" }
+            val unpacked = StagedUpdate.unpack(target, stagingDirectory.resolve("staged"))
+
+            _state.value = UpdateState.ReadyToInstall(release, unpacked.toString())
+            Log.i { "Staged ${release.version} at $unpacked" }
         } catch (e: CancellationException) {
             _state.value = UpdateState.Idle
             throw e
@@ -96,8 +100,22 @@ class UpdateRepositoryImpl(private val source: GithubReleaseSource) : UpdateRepo
         }
     }
 
-    override fun applyAndRestart() {
-        TODO("The helper swap comes next; staging is what this commit finishes.")
+    override suspend fun applyAndRestart(): Boolean {
+        val ready = _state.value as? UpdateState.ReadyToInstall ?: return false
+
+        val installed = StagedUpdate.installedBundle()
+        if (installed == null) {
+            // Under `gradlew run` there is no bundle to replace, and saying so beats a helper that
+            // waits forever for a swap that can never happen.
+            _state.value = UpdateState.Failed("This copy is not an installed app, so it cannot update itself")
+            return false
+        }
+
+        val started = StagedUpdate.swapAfterExit(installed, Path.of(ready.stagedPath))
+        if (!started) {
+            _state.value = UpdateState.Failed("Could not start the updater")
+        }
+        return started
     }
 
     override fun dismiss() {

@@ -20,12 +20,11 @@ interface UpdateRepository {
     suspend fun download(release: ReleaseInfo)
 
     /**
-     * Applies a staged update and restarts.
-     *
-     * The swap is handed to a helper process that outlives this one, because a running app cannot
-     * replace its own bundle — so this quits rather than returning.
+     * Arranges for a staged update to be installed once this process exits, and reports whether that
+     * was set up. The caller must then quit the app: a running application cannot replace its own
+     * bundle, and quitting belongs to the window rather than here.
      */
-    fun applyAndRestart()
+    suspend fun applyAndRestart(): Boolean
 
     /** Puts the state back to idle, for a notice the user has read and closed. */
     fun dismiss()

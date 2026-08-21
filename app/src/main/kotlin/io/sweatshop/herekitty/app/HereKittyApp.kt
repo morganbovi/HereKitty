@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.widthIn
@@ -23,6 +24,8 @@ import io.sweatshop.herekitty.features.workspace.WorkspaceUiModel.Event.OnNotice
 import io.sweatshop.herekitty.features.workspace.WorkspaceUiModel.Event.OnTabClosed
 import io.sweatshop.herekitty.features.workspace.WorkspaceUiModel.Event.OnTabSelected
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnSettingsOpened
+import io.sweatshop.herekitty.features.updates.UpdateBalloon
+import io.sweatshop.herekitty.features.updates.UpdatePresenter
 import io.sweatshop.herekitty.ui.notification.NotificationHost
 import io.sweatshop.herekitty.ui.theme.HereKittyTheme
 import io.sweatshop.herekitty.ui.theme.resolveDarkTheme
@@ -47,9 +50,12 @@ fun HereKittyApp(
     workspacePresenter: WorkspacePresenter = koinInject(),
     titleBar: @Composable (HereKittyAppUiModel) -> Unit = {},
     settingsRequests: Flow<Unit> = emptyFlow(),
+    onExitApplication: () -> Unit = {},
+    updatePresenter: UpdatePresenter = koinInject(),
 ) {
     val uiModel = presenter.present()
     val workspaceUiModel = workspacePresenter.present()
+    val updateUiModel = updatePresenter.present(onExitApplication)
 
     // The platform menu bar can ask for settings too, from outside the composition.
     LaunchedEffect(settingsRequests) {
@@ -57,7 +63,7 @@ fun HereKittyApp(
     }
 
     HereKittyTheme(isDark = resolveDarkTheme(uiModel.themeMode)) {
-        if (uiModel.isSettingsOpen) SettingsWindow(uiModel)
+        if (uiModel.isSettingsOpen) SettingsWindow(uiModel, updateUiModel)
 
         titleBar(uiModel)
 
@@ -68,12 +74,22 @@ fun HereKittyApp(
                 WorkspaceContent(workspaceUiModel, Modifier.weight(1f))
             }
 
-            NotificationHost(
-                notifications = workspaceUiModel.notifications,
-                dismissAfterSeconds = uiModel.notificationDismissSeconds,
-                onDismiss = { workspaceUiModel.eventHandler(OnNoticeDismissed(it)) },
+            Column(
                 modifier = Modifier.align(Alignment.BottomEnd),
-            )
+                horizontalAlignment = Alignment.End,
+            ) {
+                NotificationHost(
+                    notifications = workspaceUiModel.notifications,
+                    dismissAfterSeconds = uiModel.notificationDismissSeconds,
+                    onDismiss = { workspaceUiModel.eventHandler(OnNoticeDismissed(it)) },
+                )
+
+                // Below the notices, so an update offer is the last thing before the corner and does
+                // not get pushed around as notices come and go.
+                Box(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
+                    UpdateBalloon(updateUiModel)
+                }
+            }
         }
     }
 }

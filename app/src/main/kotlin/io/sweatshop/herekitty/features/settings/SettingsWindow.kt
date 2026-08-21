@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import io.sweatshop.herekitty.app.HereKittyAppUiModel
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnSettingsDismissed
+import io.sweatshop.herekitty.features.updates.UpdateUiModel
 import io.sweatshop.herekitty.ui.dialog.HereKittyDialog
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.Orientation
@@ -35,7 +36,7 @@ import org.jetbrains.jewel.ui.typography
 
 
 @Composable
-fun SettingsWindow(uiModel: HereKittyAppUiModel) {
+fun SettingsWindow(uiModel: HereKittyAppUiModel, updateUiModel: UpdateUiModel) {
     var selected by remember { mutableStateOf(SettingsCategory.Appearance) }
 
     HereKittyDialog(
@@ -60,6 +61,7 @@ fun SettingsWindow(uiModel: HereKittyAppUiModel) {
 
                 when (selected) {
                     SettingsCategory.Appearance -> AppearanceSettings(uiModel)
+                    SettingsCategory.Updates -> UpdateSettings(uiModel, updateUiModel)
                     SettingsCategory.LogDisplay -> LogDisplaySettings(uiModel)
                     SettingsCategory.Recording -> RecordingSettings(uiModel)
                     SettingsCategory.Prompts -> PromptSettings(uiModel)

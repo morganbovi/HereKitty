@@ -60,6 +60,8 @@ fun main() {
                 HereKittyApp(
                     titleBar = { uiModel -> TitleBar { AppTitleBarContent(uiModel) } },
                     settingsRequests = settingsRequests,
+                    // An in-place update is applied by a helper that waits for this process to go.
+                    onExitApplication = ::exitApplication,
                 )
 
                 if (isExitPromptOpen) {
