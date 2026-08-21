@@ -150,6 +150,11 @@ jobs:
         with:
           files: artifacts/*
           generate_release_notes: true
-          # A run nobody tagged is a rehearsal, so it produces something unpublished.
-          draft: ${{ github.event_name == 'workflow_dispatch' }}
+          # A rehearsal produces something unpublished: a run nobody tagged, or a tag carrying a
+          # pre-release suffix. `ref_name` is a branch for a dispatched run and would match the
+          # suffix test by accident, so that is checked only for tags.
+          draft: >-
+            ${{ github.event_name == 'workflow_dispatch'
+            || (startsWith(github.ref, 'refs/tags/') && contains(github.ref_name, '-')) }}
+          prerelease: ${{ startsWith(github.ref, 'refs/tags/') && contains(github.ref_name, '-') }}
           tag_name: ${{ inputs.version && format('v{0}', inputs.version) || github.ref_name }}
