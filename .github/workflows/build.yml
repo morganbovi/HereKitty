@@ -5,6 +5,17 @@ on:
     branches: [main]
     tags: ['v*']
   pull_request:
+  # So the whole pipeline can be exercised without cutting a real release. A dispatched run always
+  # produces a draft, and can be limited to macOS while the other two runners are still unproven.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to stamp the artifacts with
+        default: 0.0.0-test
+      macos_only:
+        description: Skip the Windows and Linux runners
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -30,25 +41,22 @@ jobs:
 
   package:
     needs: test
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     permissions:
       contents: read
     strategy:
       fail-fast: false
+      # Chosen rather than filtered: the matrix context is not available to a job-level `if`, so a
+      # rehearsal picks a smaller matrix instead of skipping entries.
       matrix:
-        include:
-          - os: macos-14
-            task: packageDmg
-            extension: dmg
-            label: macos-arm64
-          - os: ubuntu-latest
-            task: packageDeb
-            extension: deb
-            label: linux-x64
-          - os: windows-latest
-            task: packageMsi
-            extension: msi
-            label: windows-x64
+        include: >-
+          ${{ fromJSON(inputs.macos_only && '[
+            {"os":"macos-14","task":"packageDmg","extension":"dmg","label":"macos-arm64"}
+          ]' || '[
+            {"os":"macos-14","task":"packageDmg","extension":"dmg","label":"macos-arm64"},
+            {"os":"ubuntu-latest","task":"packageDeb","extension":"deb","label":"linux-x64"},
+            {"os":"windows-latest","task":"packageMsi","extension":"msi","label":"windows-x64"}
+          ]') }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -72,12 +80,15 @@ jobs:
 
       - name: Name the artifact for the platform it was built on
         shell: bash
+        env:
+          # Empty on a tag push, where the tag itself is the version.
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
           mkdir -p release
           found=$(find desktopApp/build/compose/binaries -maxdepth 3 -name "*.${{ matrix.extension }}" | head -1)
           test -n "$found" || { echo "no .${{ matrix.extension }} was produced"; exit 1; }
-          version="${GITHUB_REF_NAME#v}"
+          version="${INPUT_VERSION:-${GITHUB_REF_NAME#v}}"
           cp "$found" "release/HereKitty-${version}-${{ matrix.label }}.${{ matrix.extension }}"
 
       # The updater replaces the installed bundle, so it needs the bundle — not a disk image it would
@@ -86,9 +97,11 @@ jobs:
       - name: Archive the app bundle for the updater
         if: runner.os == 'macOS'
         shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
+          version="${INPUT_VERSION:-${GITHUB_REF_NAME#v}}"
           ditto -c -k --sequesterRsrc --keepParent \
             desktopApp/build/compose/binaries/main/app/HereKitty.app \
             "release/HereKitty-${version}-${{ matrix.label }}.zip"
@@ -102,6 +115,9 @@ jobs:
   release:
     needs: package
     runs-on: ubuntu-latest
+    # Publishing is the step worth a human. Add required reviewers to this environment in the
+    # repository settings and a pushed tag will wait for approval before anything is published.
+    environment: release
     permissions:
       contents: write
     steps:
@@ -118,7 +134,12 @@ jobs:
           sha256sum * > SHA256SUMS
           cat SHA256SUMS
 
-      - uses: softprops/action-gh-release@v2
+      # Pinned to a commit rather than a moving tag: this job holds `contents: write`, so a
+      # repointed tag would be write access to publish artifacts under this repository's name.
+      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: artifacts/*
           generate_release_notes: true
+          # A run nobody tagged is a rehearsal, so it produces something unpublished.
+          draft: ${{ github.event_name == 'workflow_dispatch' }}
+          tag_name: ${{ inputs.version && format('v{0}', inputs.version) || github.ref_name }}
