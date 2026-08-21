@@ -1,0 +1,43 @@
+HereKitty
+Copyright The HereKitty Authors
+
+Licensed under the Apache License, Version 2.0. See the LICENSE file for the
+full text.
+
+================================================================================
+Third-party components
+================================================================================
+
+Bundled inside the packaged application (.dmg / .msi / .deb)
+--------------------------------------------------------------------------------
+
+  JetBrains Runtime
+    GPL version 2 with the Classpath Exception, the same licensing as OpenJDK.
+    The Classpath Exception is what allows this application to keep its own
+    licence while linking against the runtime.
+    https://github.com/JetBrains/JetBrainsRuntime
+
+Bundled inside the application jars
+--------------------------------------------------------------------------------
+
+  IntelliJ Platform icons  (com.jetbrains.intellij.platform:icons)
+    Apache License 2.0. Only the icon resources are used. That grant covers the
+    code and assets; it does not license JetBrains trademarks.
+
+Redistributed as ordinary dependency jars
+--------------------------------------------------------------------------------
+
+  Kotlin, kotlinx.coroutines, kotlinx.serialization   Apache License 2.0
+  Compose Multiplatform                               Apache License 2.0
+  Jewel                                               Apache License 2.0
+  Koin                                                Apache License 2.0
+  kotlin-logging                                      Apache License 2.0
+  SLF4J                                               MIT License
+  Logback                                             EPL 1.0 / LGPL 2.1 (dual)
+
+Not redistributed
+--------------------------------------------------------------------------------
+
+  Android SDK platform-tools (adb) is downloaded from Google when the user asks
+  for it, and is never shipped with this application. The Android SDK's terms do
+  not grant redistribution, which is why it is fetched rather than bundled.
