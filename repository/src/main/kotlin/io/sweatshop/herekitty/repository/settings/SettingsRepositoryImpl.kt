@@ -50,6 +50,9 @@ class SettingsRepositoryImpl(private val appScope: AppScope) : SettingsRepositor
     private val _confirmExit = MutableStateFlow(stored.confirmExit)
     override val confirmExit = _confirmExit.asStateFlow()
 
+    private val _checkForUpdatesOnStartup = MutableStateFlow(stored.checkForUpdatesOnStartup)
+    override val checkForUpdatesOnStartup = _checkForUpdatesOnStartup.asStateFlow()
+
     private val _notificationDismissSeconds =
         MutableStateFlow(stored.notificationDismissSeconds.coerceAtLeast(0))
     override val notificationDismissSeconds = _notificationDismissSeconds.asStateFlow()
@@ -69,6 +72,9 @@ class SettingsRepositoryImpl(private val appScope: AppScope) : SettingsRepositor
 
     override fun setConfirmExit(confirm: Boolean) = update { _confirmExit.value = confirm }
 
+    override fun setCheckForUpdatesOnStartup(check: Boolean) =
+        update { _checkForUpdatesOnStartup.value = check }
+
     override fun setNotificationDismissSeconds(seconds: Int) =
         update { _notificationDismissSeconds.value = seconds.coerceAtLeast(0) }
 
@@ -82,6 +88,7 @@ class SettingsRepositoryImpl(private val appScope: AppScope) : SettingsRepositor
             restoreLastLayout = _restoreLastLayout.value,
             confirmSessionClose = _confirmSessionClose.value,
             confirmExit = _confirmExit.value,
+            checkForUpdatesOnStartup = _checkForUpdatesOnStartup.value,
             notificationDismissSeconds = _notificationDismissSeconds.value,
         )
         appScope.launch(Dispatchers.IO) {
@@ -116,6 +123,7 @@ class SettingsRepositoryImpl(private val appScope: AppScope) : SettingsRepositor
         val logFontScale: Float = LogFontScale.Default,
         val confirmSessionClose: Boolean = true,
         val confirmExit: Boolean = true,
+        val checkForUpdatesOnStartup: Boolean = true,
         val notificationDismissSeconds: Int = SettingsRepository.DEFAULT_NOTIFICATION_DISMISS_SECONDS,
     ) {
         fun toThemeMode(): ThemeMode = themeMode
@@ -140,6 +148,7 @@ class SettingsRepositoryImpl(private val appScope: AppScope) : SettingsRepositor
                 restoreLastLayout: Boolean,
                 confirmSessionClose: Boolean,
                 confirmExit: Boolean,
+                checkForUpdatesOnStartup: Boolean,
                 notificationDismissSeconds: Int,
             ) = Stored(
                 memoryCapBytes = memoryCapBytes,
@@ -147,6 +156,7 @@ class SettingsRepositoryImpl(private val appScope: AppScope) : SettingsRepositor
                 restoreLastLayout = restoreLastLayout,
                 confirmSessionClose = confirmSessionClose,
                 confirmExit = confirmExit,
+                checkForUpdatesOnStartup = checkForUpdatesOnStartup,
                 notificationDismissSeconds = notificationDismissSeconds,
                 showTimestamps = columns.timestamp,
                 showLevel = columns.level,

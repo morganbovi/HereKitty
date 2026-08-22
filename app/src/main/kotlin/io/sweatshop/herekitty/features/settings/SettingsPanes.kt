@@ -10,6 +10,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.sweatshop.herekitty.app.HereKittyAppUiModel
+import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnCheckForUpdatesOnStartupChanged
+import io.sweatshop.herekitty.features.updates.UpdateUiModel
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnConfirmExitChanged
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnNotificationDismissSecondsChanged
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnConfirmSessionCloseChanged
@@ -27,6 +29,7 @@ import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.CheckboxRow
 import org.jetbrains.jewel.ui.component.ListComboBox
 import org.jetbrains.jewel.ui.component.RadioButtonRow
+import org.jetbrains.jewel.ui.component.OutlinedButton
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.typography
 
@@ -190,3 +193,25 @@ private fun nearestFontScaleIndex(scale: Float): Int =
 
 private val DISMISS_LABELS: List<String> = SettingsRepository.NOTIFICATION_DISMISS_CHOICES
     .map { if (it == 0) "Never \u2014 wait for me" else "$it seconds" }
+
+@Composable
+internal fun UpdateSettings(uiModel: HereKittyAppUiModel, updateUiModel: UpdateUiModel) {
+    SettingRow("This copy") {
+        Text(updateUiModel.runningVersion.toString(), style = JewelTheme.typography.regular)
+    }
+
+    CheckboxRow(
+        text = "Check for a newer version when the app starts",
+        checked = uiModel.checkForUpdatesOnStartup,
+        onCheckedChange = { uiModel.eventHandler(OnCheckForUpdatesOnStartupChanged(it)) },
+    )
+    Hint(
+        "Asks GitHub for the latest release, unauthenticated. A launch that finds nothing says " +
+            "nothing; only an available update, or a check you asked for, shows a notice.",
+    )
+
+    OutlinedButton(
+        onClick = { updateUiModel.eventHandler(UpdateUiModel.Event.OnCheckRequested) },
+    ) { Text("Check now") }
+    Hint("An update replaces this copy in place and reopens it. The previous version is kept until the swap succeeds.")
+}

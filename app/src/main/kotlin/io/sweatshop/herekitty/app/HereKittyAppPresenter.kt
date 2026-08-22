@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnCheckForUpdatesOnStartupChanged
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnConfirmExitChanged
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnNotificationDismissSecondsChanged
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnConfirmSessionCloseChanged
@@ -32,6 +33,7 @@ class HereKittyAppPresenter(
         val logColumns by settingsRepository.logColumns.collectAsState()
         val logFontScale by settingsRepository.logFontScale.collectAsState()
         val notificationDismissSeconds by settingsRepository.notificationDismissSeconds.collectAsState()
+        val checkForUpdatesOnStartup by settingsRepository.checkForUpdatesOnStartup.collectAsState()
         val memoryCapBytes by settingsRepository.memoryCapBytes.collectAsState()
         val restoreLastLayout by settingsRepository.restoreLastLayout.collectAsState()
         val confirmSessionClose by settingsRepository.confirmSessionClose.collectAsState()
@@ -46,6 +48,7 @@ class HereKittyAppPresenter(
             logColumns = logColumns,
             logFontScale = logFontScale,
             notificationDismissSeconds = notificationDismissSeconds,
+            checkForUpdatesOnStartup = checkForUpdatesOnStartup,
             memoryCapBytes = memoryCapBytes,
             restoreLastLayout = restoreLastLayout,
             confirmSessionClose = confirmSessionClose,
@@ -62,6 +65,9 @@ class HereKittyAppPresenter(
                     is OnRestoreLastLayoutChanged -> settingsRepository.setRestoreLastLayout(event.restore)
                     is OnConfirmSessionCloseChanged -> settingsRepository.setConfirmSessionClose(event.confirm)
                     is OnConfirmExitChanged -> settingsRepository.setConfirmExit(event.confirm)
+                    is OnCheckForUpdatesOnStartupChanged ->
+                        settingsRepository.setCheckForUpdatesOnStartup(event.check)
+
                     is OnNotificationDismissSecondsChanged ->
                         settingsRepository.setNotificationDismissSeconds(event.seconds)
                     OnSettingsOpened -> isSettingsOpen = true

@@ -354,6 +354,12 @@ eviction and snapshot consistency, view index pruning, filter matching, and icon
 Place tests in `src/test/kotlin` mirroring the production package. The parsing tests use output
 captured from a real device — keep those cases when changing the parser.
 
+**The fixtures are shaped like real capture but carry no real identifiers.** This is a public repo, so
+device serials are `EXAMPLE0001` and the padded-tag case is `/      ExampleTagImpl` rather than the
+class it came from. Replacements are kept the *same length* as the originals on purpose: the parser
+test pins the exact 21-character tag width and `TagRegistryTest` pins alphabetical position, so a
+different-length name silently changes what those tests assert. Never paste raw capture straight in.
+
 `./gradlew test` needs no hardware. `LiveAdbPipelineTest` and `LiveRecordingRoundTripTest` drive the
 pipeline and the export/import round trip against an attached device, and are skipped unless you opt
 in:
@@ -372,3 +378,72 @@ and then runs the `adb` it extracted:
 Run it after changing capture, the buffer, or filtering. It is what caught the ingest loop dropping
 lines and the buffer resolving the resulting sequence gaps to the wrong line — neither of which any
 unit test noticed, because both only appear under a real firehose.
+
+## Decisions taken without confirmation
+
+Each of these was a judgement call made while building, not something asked for. They work and are
+tested; they are listed so they can be revisited as choices rather than assumed to be requirements.
+
+- **A saved view applied over an existing setup only prompts when there are unsaved changes.** The
+  brief was "more than one pane"; the extra condition was added because a setup already saved under
+  its name is one click away again, so prompting for it is nagging. See `shouldConfirmApply`.
+- **Dropping a tag on a pane's edge splits, on its middle merges.** The suggestion was "top half
+  merges, bottom half splits"; the five-region scheme was used instead so all four split directions
+  survive and the gesture matches dragging a whole pane.
+- **Dragging a pane's last tag away closes that pane.** An empty tag set means *every* tag, so the
+  alternative was a filtered pane silently turning into a firehose.
+- **Dropping a tag on an unfiltered pane pins it to that tag.** This is the opposite of
+  `mergePaneInto`, which keeps an unfiltered pane unfiltered.
+- **Errors never auto-dismiss**, whatever the notification timeout says.
+- **The delete-view prompt has no "Don't ask again"**, unlike every other prompt, because deleting a
+  `.hkview` is the one action with no undo.
+- **Closing the last tab empties it rather than removing it.** A workspace with no tabs at all would
+  have needed an empty-window screen that was never asked for.
+- **A restored layout whose device is absent keeps its view and says so on the source picker.**
+  Three related questions were never answered: whether that view should apply silently, whether the
+  tab strip should be able to empty completely, and whether a clean quit should differ from a crash.
+  The last one is not currently possible — nothing records a clean exit.
+
+## Still open
+
+
+- **Cross-pane connectors.** Timestamp-synced scrolling with IntelliJ-merge-style lines between panes.
+  Shape agreed; the pairing rule — connect only within a time window, or always to the next line — was
+  never settled.
+- **Process filtering.** `logcat -v long,epoch,uid` plus `pm list packages -U` was confirmed available
+  on the target device; it needs a `LogcatParser` change for the extra uid column.
+- **Display-only tag trimming.** Filters must keep the verbatim tag, but the leading punctuation run
+  could be hidden when drawing.
+- **Dialog title bars are the platform's.** Jewel has no decorated *dialog*, only a decorated window.
+- **A pane move loses its scroll position.** `rememberLazyListState` is local to the pane, so dragging
+  one to a different split resets it. Invisible while following the tail.
+
+## Updating itself (`:updates`, `:net`)
+
+`:net` is shared plumbing — `HttpFetch` and `Checksums` — used by both the updater and the
+platform-tools installer, which needed the same download-with-progress. `:updates` is the data source
+for GitHub releases, the analogue of `:adb`: wire format, no state. State lives in
+`:repository/updates`, and `docs/app-updater-plan.md` records why the pieces are shaped as they are.
+
+- **`HttpURLConnection`, never `java.net.http`.** `HttpClient` is not in the runtime image jpackage
+  builds, so anything using it works under `run` and dies in the packaged app. This is the third thing
+  in this project to have that shape; `HttpFetch`'s doc comment says so at the point of temptation.
+- **A release carries a `ditto` archive as well as a disk image.** Replacing an installed app needs the
+  bundle, and getting one out of a disk image means mounting, copying and unmounting, with a mount
+  point to leak on failure. Same split Sparkle makes: images for people, archives for updaters. `ditto`
+  and not `java.util.zip`, which loses a bundle's symlinks and permission bits.
+- **Nothing unverified is ever installed.** Applying an update replaces the running application, so a
+  release published without `SHA256SUMS` is treated as unverifiable rather than trusted. That catches a
+  corrupted or substituted download, not a bad release — the checksums travel with the payload, and
+  only a signed app would give that.
+- **The swap outlives the app.** A detached `/bin/sh` helper waits on this process's id, moves the old
+  bundle aside, and puts it back if the replacement fails — so a failure leaves the previous version
+  rather than nothing. `applyAndRestart` reports whether the helper started and leaves quitting to the
+  window, because `exitApplication` belongs there.
+- **A 404 means "nothing published yet", not a failure.** Until the first release that is the honest
+  answer, and a launch that finds nothing says nothing: only an available update, or a check someone
+  asked for, puts a balloon on screen (`UpdateUiModel.isWorthShowing`).
+- **Decisions live in pure functions.** `UpdateCheck.outcomeOf` takes an already-resolved asset so it
+  does not depend on the machine it runs on, which is also what lets every case be tested on the Linux
+  CI runner. It refuses a release equal to or older than the running one, because an update must never
+  offer a downgrade.
