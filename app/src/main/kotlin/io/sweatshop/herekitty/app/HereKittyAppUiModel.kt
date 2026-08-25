@@ -15,6 +15,7 @@ data class HereKittyAppUiModel(
     val confirmExit: Boolean,
     val notificationDismissSeconds: Int,
     val checkForUpdatesOnStartup: Boolean,
+    val selectMessageOnly: Boolean,
     val serverState: AdbServerState,
     val deviceCount: Int,
     val isSettingsOpen: Boolean,
@@ -47,6 +48,8 @@ data class HereKittyAppUiModel(
         data class OnNotificationDismissSecondsChanged(val seconds: Int) : Event
 
         data class OnCheckForUpdatesOnStartupChanged(val check: Boolean) : Event
+
+        data class OnSelectMessageOnlyChanged(val messageOnly: Boolean) : Event
 
         data object OnSettingsOpened : Event
 

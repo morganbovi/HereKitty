@@ -19,6 +19,7 @@ import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnLogColumnsChanged
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnLogFontScaleChanged
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnMemoryCapChosen
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnRestoreLastLayoutChanged
+import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnSelectMessageOnlyChanged
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnThemeModeChanged
 import io.sweatshop.herekitty.domain.features.settings.model.LogFontScale
 import io.sweatshop.herekitty.domain.features.settings.model.LogLineLayout
@@ -104,6 +105,13 @@ internal fun LogDisplaySettings(uiModel: HereKittyAppUiModel) {
         onCheckedChange = { uiModel.eventHandler(OnLogColumnsChanged(columns.copy(softWrap = it))) },
     )
     Hint("A pane watching several tags always shows the tag, whatever this says, so its lines can be told apart.")
+
+    CheckboxRow(
+        text = "Selecting text selects only the message",
+        checked = uiModel.selectMessageOnly,
+        onCheckedChange = { uiModel.eventHandler(OnSelectMessageOnlyChanged(it)) },
+    )
+    Hint("Off drags the timestamp, level, and tag along with the message when you select across lines.")
 }
 
 @Composable

@@ -23,6 +23,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
+import androidx.compose.foundation.text.selection.DisableSelection
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -519,6 +521,7 @@ private fun LogLines(uiModel: LogPaneUiModel, modifier: Modifier) {
             console = console,
             minWidth = if (scrollsSideways) viewportWidth else Dp.Unspecified,
             tagActions = tagActions,
+            selectMessageOnly = uiModel.selectMessageOnly,
         )
     }
 
@@ -536,6 +539,9 @@ private fun LogLines(uiModel: LogPaneUiModel, modifier: Modifier) {
                 if (isDeliberateUpwardScroll(deltaX, deltaY)) uiModel.eventHandler(OnScrolledUp)
             },
     ) {
+        // Scoped by the message-only setting inside each row layout (see MaybeDisableSelection) so a
+        // drag across rows copies exactly the log content the setting says it should.
+        SelectionContainer {
         Box(
             Modifier
                 .fillMaxSize()
@@ -554,7 +560,11 @@ private fun LogLines(uiModel: LogPaneUiModel, modifier: Modifier) {
                         }
                     }
                     item(key = "event-${event.seq}") {
-                        SessionEventRow(event, minWidth = if (scrollsSideways) viewportWidth else Dp.Unspecified)
+                        SessionEventRow(
+                            event = event,
+                            minWidth = if (scrollsSideways) viewportWidth else Dp.Unspecified,
+                            selectMessageOnly = uiModel.selectMessageOnly,
+                        )
                     }
                     from = insertBeforeIndex
                 }
@@ -565,6 +575,7 @@ private fun LogLines(uiModel: LogPaneUiModel, modifier: Modifier) {
                     }
                 }
             }
+        }
         }
 
         VerticalScrollbar(
@@ -616,7 +627,7 @@ private fun placementsFor(snapshot: LogSnapshot, events: List<SessionEvent>): Li
 }
 
 @Composable
-private fun SessionEventRow(event: SessionEvent, minWidth: Dp) {
+private fun SessionEventRow(event: SessionEvent, minWidth: Dp, selectMessageOnly: Boolean) {
     val scrollsSideways = minWidth != Dp.Unspecified
 
     Row(
@@ -629,16 +640,24 @@ private fun SessionEventRow(event: SessionEvent, minWidth: Dp) {
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Divider(Orientation.Horizontal, modifier = Modifier.weight(1f))
-        Text(
-            text = "${event.kind.label} · ${formatTimeOfDay(event.timestampMillis)}",
-            style = JewelTheme.typography.regular,
-            fontWeight = FontWeight.Medium,
-            color = JewelTheme.globalColors.text.info,
-            maxLines = 1,
-            softWrap = false,
-        )
+        MaybeDisableSelection(selectMessageOnly) {
+            Text(
+                text = "${event.kind.label} · ${formatTimeOfDay(event.timestampMillis)}",
+                style = JewelTheme.typography.regular,
+                fontWeight = FontWeight.Medium,
+                color = JewelTheme.globalColors.text.info,
+                maxLines = 1,
+                softWrap = false,
+            )
+        }
         Divider(Orientation.Horizontal, modifier = Modifier.weight(1f))
     }
+}
+
+/** Only excludes its content from selection when the setting narrows selection to message text. */
+@Composable
+private fun MaybeDisableSelection(disabled: Boolean, content: @Composable () -> Unit) {
+    if (disabled) DisableSelection(content) else content()
 }
 
 @Composable
@@ -650,11 +669,13 @@ private fun LogRow(
     console: TextStyle,
     minWidth: Dp,
     tagActions: TagActions,
+    selectMessageOnly: Boolean,
 ) {
     when (columns.layout) {
-        LogLineLayout.Columns -> ColumnarLogRow(line, repeatCount, columns, console, minWidth, tagActions)
+        LogLineLayout.Columns ->
+            ColumnarLogRow(line, repeatCount, columns, console, minWidth, tagActions, selectMessageOnly)
         LogLineLayout.Stacked ->
-            StackedLogRow(line, previous, repeatCount, columns, console, minWidth, tagActions)
+            StackedLogRow(line, previous, repeatCount, columns, console, minWidth, tagActions, selectMessageOnly)
     }
 }
 
@@ -754,6 +775,7 @@ private fun StackedLogRow(
     console: TextStyle,
     minWidth: Dp,
     tagActions: TagActions,
+    selectMessageOnly: Boolean,
 ) {
     val levelColor = colorFor(line.level)
     val dimColor = JewelTheme.globalColors.text.info
@@ -766,18 +788,20 @@ private fun StackedLogRow(
             .padding(horizontal = 4.dp),
     ) {
         if (metadata.isNotEmpty() && needsMetadataHeader(previous, line)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                metadata.forEachIndexed { index, part ->
-                    // Small text needs the contrast the message does not: the values are read at a
-                    // glance, while the separators are only structure and stay quiet.
-                    if (index > 0) MetadataText(METADATA_SEPARATOR, dimColor, console)
+            MaybeDisableSelection(selectMessageOnly) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    metadata.forEachIndexed { index, part ->
+                        // Small text needs the contrast the message does not: the values are read at
+                        // a glance, while the separators are only structure and stay quiet.
+                        if (index > 0) MetadataText(METADATA_SEPARATOR, dimColor, console)
 
-                    if (part.isTag) {
-                        TagTarget(line.tag, tagActions) {
+                        if (part.isTag) {
+                            TagTarget(line.tag, tagActions) {
+                                MetadataText(part.text, JewelTheme.globalColors.text.normal, console)
+                            }
+                        } else {
                             MetadataText(part.text, JewelTheme.globalColors.text.normal, console)
                         }
-                    } else {
-                        MetadataText(part.text, JewelTheme.globalColors.text.normal, console)
                     }
                 }
             }
@@ -787,7 +811,8 @@ private fun StackedLogRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            if (repeatCount > 1) RepeatBadge(repeatCount, console)
+            // Message-only selection is a setting, not a fixed rule — see MaybeDisableSelection.
+            if (repeatCount > 1) MaybeDisableSelection(selectMessageOnly) { RepeatBadge(repeatCount, console) }
 
             Text(
                 text = line.message,
@@ -834,6 +859,7 @@ private fun ColumnarLogRow(
     console: TextStyle,
     minWidth: Dp,
     tagActions: TagActions,
+    selectMessageOnly: Boolean,
 ) {
     val levelColor = colorFor(line.level)
     val dimColor = JewelTheme.globalColors.text.info
@@ -847,54 +873,57 @@ private fun ColumnarLogRow(
             .padding(horizontal = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        if (columns.timestamp) {
-            Text(
-                text = formatTimeOfDay(line.timestampMillis),
-                style = console,
-                color = dimColor,
-                maxLines = 1,
-                softWrap = false,
-            )
-        }
-
-        if (columns.processIds) {
-            Text(
-                text = "${line.pid}-${line.tid}",
-                style = console,
-                color = dimColor,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Clip,
-                modifier = Modifier.width(PROCESS_COLUMN_WIDTH),
-            )
-        }
-
-        if (columns.level) {
-            Text(
-                text = line.level.letter.toString(),
-                style = console,
-                color = levelColor,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                softWrap = false,
-            )
-        }
-
-        if (columns.tag) {
-            TagTarget(line.tag, tagActions) {
+        // Message-only selection is a setting, not a fixed rule — see MaybeDisableSelection.
+        MaybeDisableSelection(selectMessageOnly) {
+            if (columns.timestamp) {
                 Text(
-                    text = line.tag.trim(),
+                    text = formatTimeOfDay(line.timestampMillis),
                     style = console,
                     color = dimColor,
                     maxLines = 1,
                     softWrap = false,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.width(TAG_COLUMN_WIDTH),
                 )
             }
-        }
 
-        if (repeatCount > 1) RepeatBadge(repeatCount, console)
+            if (columns.processIds) {
+                Text(
+                    text = "${line.pid}-${line.tid}",
+                    style = console,
+                    color = dimColor,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Clip,
+                    modifier = Modifier.width(PROCESS_COLUMN_WIDTH),
+                )
+            }
+
+            if (columns.level) {
+                Text(
+                    text = line.level.letter.toString(),
+                    style = console,
+                    color = levelColor,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            }
+
+            if (columns.tag) {
+                TagTarget(line.tag, tagActions) {
+                    Text(
+                        text = line.tag.trim(),
+                        style = console,
+                        color = dimColor,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.width(TAG_COLUMN_WIDTH),
+                    )
+                }
+            }
+
+            if (repeatCount > 1) RepeatBadge(repeatCount, console)
+        }
 
         Text(
             text = line.message,

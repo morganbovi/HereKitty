@@ -14,6 +14,7 @@ import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnLogColumnsChanged
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnLogFontScaleChanged
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnMemoryCapChosen
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnRestoreLastLayoutChanged
+import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnSelectMessageOnlyChanged
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnSettingsDismissed
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnSettingsOpened
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnThemeModeChanged
@@ -38,6 +39,7 @@ class HereKittyAppPresenter(
         val restoreLastLayout by settingsRepository.restoreLastLayout.collectAsState()
         val confirmSessionClose by settingsRepository.confirmSessionClose.collectAsState()
         val confirmExit by settingsRepository.confirmExit.collectAsState()
+        val selectMessageOnly by settingsRepository.selectMessageOnly.collectAsState()
         val serverState by deviceRepository.serverState.collectAsState()
         val devices by deviceRepository.devices.collectAsState()
 
@@ -53,6 +55,7 @@ class HereKittyAppPresenter(
             restoreLastLayout = restoreLastLayout,
             confirmSessionClose = confirmSessionClose,
             confirmExit = confirmExit,
+            selectMessageOnly = selectMessageOnly,
             serverState = serverState,
             deviceCount = devices.size,
             isSettingsOpen = isSettingsOpen,
@@ -65,6 +68,7 @@ class HereKittyAppPresenter(
                     is OnRestoreLastLayoutChanged -> settingsRepository.setRestoreLastLayout(event.restore)
                     is OnConfirmSessionCloseChanged -> settingsRepository.setConfirmSessionClose(event.confirm)
                     is OnConfirmExitChanged -> settingsRepository.setConfirmExit(event.confirm)
+                    is OnSelectMessageOnlyChanged -> settingsRepository.setSelectMessageOnly(event.messageOnly)
                     is OnCheckForUpdatesOnStartupChanged ->
                         settingsRepository.setCheckForUpdatesOnStartup(event.check)
 

@@ -27,6 +27,9 @@ interface SettingsRepository {
     /** How long a notification waits before dismissing itself. Zero means it waits for you. */
     val notificationDismissSeconds: StateFlow<Int>
 
+    /** Whether dragging across log rows selects only the message, not the timestamp/tag/etc. too. */
+    val selectMessageOnly: StateFlow<Boolean>
+
     fun setMemoryCapBytes(bytes: Long)
 
     fun setThemeMode(mode: ThemeMode)
@@ -44,6 +47,8 @@ interface SettingsRepository {
     fun setCheckForUpdatesOnStartup(check: Boolean)
 
     fun setNotificationDismissSeconds(seconds: Int)
+
+    fun setSelectMessageOnly(messageOnly: Boolean)
 
     companion object {
         const val DEFAULT_MEMORY_CAP_BYTES: Long = 512L * 1024 * 1024
