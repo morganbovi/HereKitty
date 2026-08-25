@@ -10,11 +10,4 @@ data class LogFilter(
 ) {
     val isPassThrough: Boolean
         get() = tags.isEmpty() && excludeTags.isEmpty() && query.isBlank() && minLevel == LogLevel.VERBOSE
-
-    val describesTags: String
-        get() = when {
-            tags.isEmpty() -> ""
-            tags.size == 1 -> tags.first()
-            else -> "${tags.size} tags"
-        }
 }

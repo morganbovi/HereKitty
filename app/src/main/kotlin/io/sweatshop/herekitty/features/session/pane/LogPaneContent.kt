@@ -1,11 +1,12 @@
 package io.sweatshop.herekitty.features.session.pane
 
 import androidx.compose.foundation.ContextMenuArea
-import androidx.compose.foundation.PointerMatcher
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.onClick
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,10 +37,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -185,7 +188,9 @@ private fun PaneToolbar(uiModel: LogPaneUiModel, grip: ReorderGrip) {
                     ) {
                         Icon(AllIconsKeys.Nodes.Tag, contentDescription = "Tags")
                         Text(
-                            text = uiModel.filter.describesTags.ifEmpty { "All tags" },
+                            // The selected tags already show as their own chip row below, so this
+                            // button stays a fixed label rather than echoing what it opens a picker for.
+                            text = "Search tags",
                             style = JewelTheme.typography.small,
                             color = if (uiModel.filter.tags.isEmpty()) {
                                 JewelTheme.globalColors.text.info
@@ -723,10 +728,26 @@ private fun TagTarget(tag: String, actions: TagActions, content: @Composable () 
         },
     ) {
         Box(
-            // Bound to the primary button so it cannot swallow the right-click the menu needs.
+            // Click detection runs in the Initial pointer pass — before the selectable text
+            // underneath gets a look — and only fires if nothing consumed a position change by the
+            // time the pointer comes back up. A clean tap reaches here untouched; a drag that grows
+            // into a text selection gets its move events consumed by the selection handling running
+            // in the Main pass, which waitForUpOrCancellation treats as a cancel. That is what lets a
+            // click still toggle the tag while a drag through it still selects its text.
+            //
+            // The padding sits after the gesture modifier so it grows the hit area rather than just
+            // the visual gap — stacked mode's tag has no fixed column width behind it, so its target
+            // was only ever as big as the rendered text itself, easy to miss at that line's small size.
             Modifier
                 .pointerHoverIcon(TAG_CURSOR)
-                .onClick(matcher = PointerMatcher.Primary) { actions.onClick(tag) },
+                .pointerInput(tag, actions) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        val up = waitForUpOrCancellation(pass = PointerEventPass.Initial)
+                        if (up != null) actions.onClick(tag)
+                    }
+                }
+                .padding(vertical = 3.dp, horizontal = 2.dp),
         ) {
             content()
         }
