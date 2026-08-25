@@ -76,6 +76,7 @@ class SessionPresenter(
         val stats by session.stats.collectAsState()
         val devices by deviceRepository.devices.collectAsState()
         val askBeforeClosing by settingsRepository.confirmSessionClose.collectAsState()
+        val isCompactView by settingsRepository.isCompactView.collectAsState()
 
         var isExporting by remember(session) { mutableStateOf(false) }
         var isCloseConfirmOpen by remember(session) { mutableStateOf(false) }
@@ -101,6 +102,7 @@ class SessionPresenter(
             askBeforeClosing = askBeforeClosing,
             isExporting = isExporting,
             canCloseSession = canCloseSession,
+            isCompactView = isCompactView,
             eventHandler = EventHandler(session.id, view.root) { event ->
                 when (event) {
                     OnAddPaneClicked -> changeLayout { addPane(it) }

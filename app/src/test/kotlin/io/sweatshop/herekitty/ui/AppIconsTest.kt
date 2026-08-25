@@ -24,6 +24,7 @@ class AppIconsTest {
         "General.Mouse" to AllIconsKeys.General.Mouse,
         "General.History" to AllIconsKeys.General.History,
         "General.Drag" to AllIconsKeys.General.Drag,
+        "General.HideToolWindow" to AllIconsKeys.General.HideToolWindow,
         "Nodes.Tag" to AllIconsKeys.Nodes.Tag,
         "Actions.Search" to AllIconsKeys.Actions.Search,
         "Actions.MatchCase" to AllIconsKeys.Actions.MatchCase,

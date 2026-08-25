@@ -27,6 +27,7 @@ data class SessionUiModel(
     val askBeforeClosing: Boolean,
     val isExporting: Boolean,
     val canCloseSession: Boolean,
+    val isCompactView: Boolean,
     val eventHandler: EventHandler<Event>,
 ) {
     val root: PaneNode get() = view.root

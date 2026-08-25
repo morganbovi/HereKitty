@@ -136,13 +136,19 @@ fun LogPaneContent(
     )
 
     Column(modifier.fillMaxSize()) {
-        PaneToolbar(uiModel, grip)
-        SearchRow(uiModel)
-        if (uiModel.filter.tags.isNotEmpty() && !uiModel.isCrashesFilterActive) SelectedTagRow(uiModel, tagGrip)
-        Divider(Orientation.Horizontal)
+        if (!uiModel.isCompactView) {
+            PaneToolbar(uiModel, grip)
+            SearchRow(uiModel)
+            if (uiModel.filter.tags.isNotEmpty() && !uiModel.isCrashesFilterActive) {
+                SelectedTagRow(uiModel, tagGrip)
+            }
+            Divider(Orientation.Horizontal)
+        }
         LogLines(uiModel, Modifier.weight(1f))
-        Divider(Orientation.Horizontal)
-        PaneStatusBar(uiModel)
+        if (!uiModel.isCompactView) {
+            Divider(Orientation.Horizontal)
+            PaneStatusBar(uiModel)
+        }
     }
 }
 

@@ -24,6 +24,7 @@ import io.sweatshop.herekitty.domain.features.lifecycle.repository.AppLifecycleR
 import io.sweatshop.herekitty.domain.features.logs.repository.LastSessionRepository
 import io.sweatshop.herekitty.domain.features.logs.repository.LogSessionRepository
 import io.sweatshop.herekitty.domain.features.settings.repository.SettingsRepository
+import io.sweatshop.herekitty.ui.keyboard.rememberCompactViewShortcuts
 import io.sweatshop.herekitty.ui.keyboard.rememberFontScaleShortcuts
 import io.sweatshop.herekitty.ui.theme.HereKittyTheme
 import io.sweatshop.herekitty.ui.theme.resolveDarkTheme
@@ -70,6 +71,7 @@ fun main() {
         }
 
         val onFontScaleKey = rememberFontScaleShortcuts()
+        val onCompactViewKey = rememberCompactViewShortcuts()
 
         HereKittyTheme(isDark = resolveDarkTheme(themeMode)) {
             DecoratedWindow(
@@ -78,7 +80,7 @@ fun main() {
                 state = rememberWindowState(size = DpSize(1600.dp, 920.dp)),
                 title = "HereKitty",
                 icon = AppIcon.painter,
-                onKeyEvent = onFontScaleKey,
+                onKeyEvent = { onFontScaleKey(it) || onCompactViewKey(it) },
             ) {
                 HereKittyApp(
                     titleBar = { uiModel -> TitleBar { AppTitleBarContent(uiModel) } },

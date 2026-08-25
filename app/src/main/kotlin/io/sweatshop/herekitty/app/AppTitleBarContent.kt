@@ -7,9 +7,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnCompactViewToggled
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnSettingsOpened
 import io.sweatshop.herekitty.domain.features.logs.model.LogLevel
 import io.sweatshop.herekitty.ui.component.IconAction
+import io.sweatshop.herekitty.ui.component.ToggleableIconAction
 import io.sweatshop.herekitty.ui.theme.colorFor
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.Text
@@ -42,6 +44,12 @@ fun TitleBarScope.AppTitleBarContent(uiModel: HereKittyAppUiModel) {
         modifier = Modifier.align(Alignment.End).padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        ToggleableIconAction(
+            key = AllIconsKeys.General.HideToolWindow,
+            description = if (uiModel.isCompactView) "Show toolbars (Esc)" else "Compact view",
+            value = uiModel.isCompactView,
+            onValueChange = { uiModel.eventHandler(OnCompactViewToggled) },
+        )
         IconAction(
             key = AllIconsKeys.General.Settings,
             description = "Settings",

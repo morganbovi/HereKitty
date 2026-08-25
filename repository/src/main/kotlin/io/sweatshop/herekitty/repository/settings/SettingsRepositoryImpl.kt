@@ -60,6 +60,11 @@ class SettingsRepositoryImpl(private val appScope: AppScope) : SettingsRepositor
     private val _selectMessageOnly = MutableStateFlow(stored.selectMessageOnly)
     override val selectMessageOnly = _selectMessageOnly.asStateFlow()
 
+    // In-memory only: setCompactView() deliberately never calls update(), so this is the one flow
+    // here that does not round-trip through Stored/settings.json.
+    private val _isCompactView = MutableStateFlow(false)
+    override val isCompactView = _isCompactView.asStateFlow()
+
     override fun setMemoryCapBytes(bytes: Long) = update { _memoryCapBytes.value = bytes }
 
     override fun setThemeMode(mode: ThemeMode) = update { _themeMode.value = mode }
@@ -83,6 +88,11 @@ class SettingsRepositoryImpl(private val appScope: AppScope) : SettingsRepositor
 
     override fun setSelectMessageOnly(messageOnly: Boolean) =
         update { _selectMessageOnly.value = messageOnly }
+
+    // No update() call: intentionally never written to settings.json — see isCompactView above.
+    override fun setCompactView(compact: Boolean) {
+        _isCompactView.value = compact
+    }
 
     private fun update(change: () -> Unit) {
         change()

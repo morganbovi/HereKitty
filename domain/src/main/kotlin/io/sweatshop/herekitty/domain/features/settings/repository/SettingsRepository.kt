@@ -30,6 +30,13 @@ interface SettingsRepository {
     /** Whether dragging across log rows selects only the message, not the timestamp/tag/etc. too. */
     val selectMessageOnly: StateFlow<Boolean>
 
+    /**
+     * Whether every toolbar, search box, and status bar is hidden, leaving only log lines. Not
+     * persisted, unlike everything else here: a launch should never come up looking stripped down
+     * for a reason nobody in that session chose.
+     */
+    val isCompactView: StateFlow<Boolean>
+
     fun setMemoryCapBytes(bytes: Long)
 
     fun setThemeMode(mode: ThemeMode)
@@ -49,6 +56,8 @@ interface SettingsRepository {
     fun setNotificationDismissSeconds(seconds: Int)
 
     fun setSelectMessageOnly(messageOnly: Boolean)
+
+    fun setCompactView(compact: Boolean)
 
     companion object {
         const val DEFAULT_MEMORY_CAP_BYTES: Long = 512L * 1024 * 1024

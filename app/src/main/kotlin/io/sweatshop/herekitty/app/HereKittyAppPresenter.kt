@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnCheckForUpdatesOnStartupChanged
+import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnCompactViewToggled
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnConfirmExitChanged
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnNotificationDismissSecondsChanged
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnConfirmSessionCloseChanged
@@ -40,6 +41,7 @@ class HereKittyAppPresenter(
         val confirmSessionClose by settingsRepository.confirmSessionClose.collectAsState()
         val confirmExit by settingsRepository.confirmExit.collectAsState()
         val selectMessageOnly by settingsRepository.selectMessageOnly.collectAsState()
+        val isCompactView by settingsRepository.isCompactView.collectAsState()
         val serverState by deviceRepository.serverState.collectAsState()
         val devices by deviceRepository.devices.collectAsState()
 
@@ -56,6 +58,7 @@ class HereKittyAppPresenter(
             confirmSessionClose = confirmSessionClose,
             confirmExit = confirmExit,
             selectMessageOnly = selectMessageOnly,
+            isCompactView = isCompactView,
             serverState = serverState,
             deviceCount = devices.size,
             isSettingsOpen = isSettingsOpen,
@@ -69,6 +72,7 @@ class HereKittyAppPresenter(
                     is OnConfirmSessionCloseChanged -> settingsRepository.setConfirmSessionClose(event.confirm)
                     is OnConfirmExitChanged -> settingsRepository.setConfirmExit(event.confirm)
                     is OnSelectMessageOnlyChanged -> settingsRepository.setSelectMessageOnly(event.messageOnly)
+                    OnCompactViewToggled -> settingsRepository.setCompactView(!isCompactView)
                     is OnCheckForUpdatesOnStartupChanged ->
                         settingsRepository.setCheckForUpdatesOnStartup(event.check)
 

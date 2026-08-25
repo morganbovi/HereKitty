@@ -16,6 +16,7 @@ data class HereKittyAppUiModel(
     val notificationDismissSeconds: Int,
     val checkForUpdatesOnStartup: Boolean,
     val selectMessageOnly: Boolean,
+    val isCompactView: Boolean,
     val serverState: AdbServerState,
     val deviceCount: Int,
     val isSettingsOpen: Boolean,
@@ -50,6 +51,8 @@ data class HereKittyAppUiModel(
         data class OnCheckForUpdatesOnStartupChanged(val check: Boolean) : Event
 
         data class OnSelectMessageOnlyChanged(val messageOnly: Boolean) : Event
+
+        data object OnCompactViewToggled : Event
 
         data object OnSettingsOpened : Event
 
