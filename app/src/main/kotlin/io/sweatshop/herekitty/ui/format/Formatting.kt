@@ -30,6 +30,17 @@ fun formatCount(count: Long): String = when {
     else -> count.toString()
 }
 
+/**
+ * Keeps both ends of a long name rather than just the start: a file's extension and whatever makes
+ * it distinct from its siblings (a date, a version) tend to live at the end, not the middle.
+ */
+fun truncateMiddle(text: String, maxLength: Int = 24): String {
+    if (text.length <= maxLength) return text
+    val headLength = (maxLength - 1) / 2
+    val tailLength = maxLength - 1 - headLength
+    return "${text.take(headLength)}…${text.takeLast(tailLength)}"
+}
+
 private const val KIB = 1024L
 private const val MIB = KIB * 1024L
 private const val GIB = MIB * 1024L
