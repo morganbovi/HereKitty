@@ -2,6 +2,7 @@ package io.sweatshop.herekitty.domain.features.logs.repository
 
 import io.sweatshop.herekitty.domain.features.logs.model.BufferStats
 import io.sweatshop.herekitty.domain.features.logs.model.ConnectionState
+import io.sweatshop.herekitty.domain.features.logs.model.SessionEvent
 import io.sweatshop.herekitty.domain.features.logs.model.SessionSource
 import io.sweatshop.herekitty.domain.features.logs.model.TagStats
 import io.sweatshop.herekitty.domain.features.views.model.ViewConfig
@@ -24,6 +25,9 @@ interface LogSession {
 
     /** Every tag seen since the session opened, alphabetical. Never evicted. */
     val tags: StateFlow<List<TagStats>>
+
+    /** Disconnects, reconnects, and pauses, in order. Never evicted — there are only ever a handful. */
+    val events: StateFlow<List<SessionEvent>>
 
     /** False for an imported recording, which has nothing left to capture. */
     val isLive: Boolean

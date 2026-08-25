@@ -2,6 +2,7 @@ package io.sweatshop.herekitty.features.session.pane
 
 import io.sweatshop.herekitty.domain.features.logs.model.LogFilter
 import io.sweatshop.herekitty.domain.features.logs.model.LogLevel
+import io.sweatshop.herekitty.domain.features.logs.model.SessionEvent
 import io.sweatshop.herekitty.domain.features.logs.model.TagStats
 import io.sweatshop.herekitty.domain.features.logs.repository.LogSnapshot
 import io.sweatshop.herekitty.domain.features.views.model.LayoutOrientation
@@ -15,6 +16,8 @@ data class LogPaneUiModel(
     val filter: LogFilter,
     val queryInput: String,
     val snapshot: LogSnapshot,
+    /** Disconnects, reconnects, and pauses — shown regardless of this pane's own filter. */
+    val events: List<SessionEvent>,
     val revision: Long,
     val isRebuilding: Boolean,
     val hasInvalidRegex: Boolean,

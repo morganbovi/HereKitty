@@ -70,6 +70,7 @@ class LogPanePresenter(private val settingsRepository: SettingsRepository) {
         val revision by view.revision.collectAsState()
         val isRebuilding by view.isRebuilding.collectAsState()
         val availableTags by session.tags.collectAsState()
+        val events by session.events.collectAsState()
         val columns by settingsRepository.logColumns.collectAsState()
         val fontScale by settingsRepository.logFontScale.collectAsState()
 
@@ -100,6 +101,7 @@ class LogPanePresenter(private val settingsRepository: SettingsRepository) {
             filter = config.filter,
             queryInput = queryInput,
             snapshot = snapshot,
+            events = events,
             revision = revision,
             isRebuilding = isRebuilding,
             hasInvalidRegex = config.filter.useRegex &&

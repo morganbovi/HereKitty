@@ -5,8 +5,7 @@ import io.sweatshop.herekitty.adb.LogcatParser
 import io.sweatshop.herekitty.domain.base.Log
 import io.sweatshop.herekitty.domain.features.devices.model.AdbDevice
 import io.sweatshop.herekitty.domain.features.logs.model.ConnectionState
-import io.sweatshop.herekitty.domain.features.logs.model.LogLevel
-import io.sweatshop.herekitty.domain.features.logs.model.LogLine
+import io.sweatshop.herekitty.domain.features.logs.model.SessionEvent
 import io.sweatshop.herekitty.domain.features.logs.model.SessionSource
 import io.sweatshop.herekitty.domain.features.logs.repository.SessionId
 import kotlinx.coroutines.CancellationException
@@ -42,6 +41,15 @@ internal class DeviceLogSession(
     private var captureJob: Job? = null
     private var isPaused = false
 
+    // Instance-level rather than local to launchCapture()'s coroutine: mutableConnection.value gets
+    // overwritten to Connecting at the top of every retry, so it cannot itself say whether the stream
+    // that is about to start is a first connect or a recovery — and a manual Reconnect click cancels
+    // and restarts that coroutine entirely, which a coroutine-local flag would not survive either.
+    @Volatile private var wasDisconnected = false
+
+    /** Same reasoning as [wasDisconnected]: a deliberate pause, not a drop, so it gets its own flag. */
+    @Volatile private var wasPaused = false
+
     init {
         launchCapture()
     }
@@ -56,14 +64,19 @@ internal class DeviceLogSession(
         if (paused) {
             captureJob?.cancel()
             mutableConnection.value = ConnectionState.Paused
+            recordEvent(SessionEvent.Kind.Paused)
+            wasPaused = true
         } else {
-            launchCapture()
+            // Not a fresh open: dropping the -T limit here would replay the device's whole retained
+            // backlog into a pane that may have just been cleared, looking exactly like old lines
+            // coming back from the dead.
+            launchCapture(RESUME_TAIL_LINES)
         }
     }
 
     override fun reconnect() {
         isPaused = false
-        launchCapture()
+        launchCapture(RESUME_TAIL_LINES)
     }
 
     override fun dispose() {
@@ -71,11 +84,11 @@ internal class DeviceLogSession(
         super.dispose()
     }
 
-    private fun launchCapture() {
+    /** [initialTailLines] is only ever `null` for the very first connect, to show what's already there. */
+    private fun launchCapture(initialTailLines: Int? = null) {
         captureJob?.cancel()
         captureJob = scope.launch(Dispatchers.IO) {
-            var tailLines: Int? = null
-            var hasStreamedBefore = false
+            var tailLines = initialTailLines
 
             while (isActive) {
                 mutableConnection.value = ConnectionState.Connecting
@@ -84,12 +97,22 @@ internal class DeviceLogSession(
                     hostClient.streamLogcat(serial, tailLines).collect { rawLine ->
                         if (!streaming) {
                             streaming = true
+                            when {
+                                wasDisconnected -> {
+                                    recordEvent(SessionEvent.Kind.Reconnected)
+                                    wasDisconnected = false
+                                }
+                                wasPaused -> {
+                                    recordEvent(SessionEvent.Kind.Resumed)
+                                    wasPaused = false
+                                }
+                            }
                             mutableConnection.value = ConnectionState.Streaming
-                            if (hasStreamedBefore) submit(marker(RESUMED_MESSAGE))
                         }
                         parser.accept(rawLine)?.let { submit(it) }
                     }
                     parser.flush()?.let { submit(it) }
+                    markDisconnectedIfWasStreaming()
                     mutableConnection.value = ConnectionState.Waiting("Device disconnected")
                 } catch (e: CancellationException) {
                     throw e
@@ -98,30 +121,23 @@ internal class DeviceLogSession(
                     // CancellationException, so closing the session must not look like a dropout.
                     currentCoroutineContext().ensureActive()
                     Log.w(e) { "logcat stream for $serial ended" }
+                    markDisconnectedIfWasStreaming()
                     mutableConnection.value = ConnectionState.Waiting(e.message ?: "Waiting for $serial")
                 }
 
-                hasStreamedBefore = true
                 tailLines = RESUME_TAIL_LINES
                 delay(RECONNECT_DELAY_MILLIS)
             }
         }
     }
 
-    private fun marker(message: String) = LogLine(
-        seq = nextSequence(),
-        timestampMillis = System.currentTimeMillis(),
-        pid = 0,
-        tid = 0,
-        level = LogLevel.INFO,
-        tag = MARKER_TAG,
-        message = message,
-    )
+    private fun markDisconnectedIfWasStreaming() {
+        if (mutableConnection.value != ConnectionState.Streaming) return
+        recordEvent(SessionEvent.Kind.Disconnected)
+        wasDisconnected = true
+    }
 
     private companion object {
-        const val MARKER_TAG = "HereKitty"
-        const val RESUMED_MESSAGE =
-            "Reconnected. Lines the device emitted while it was unplugged could not be recovered."
         const val RECONNECT_DELAY_MILLIS = 1_000L
         const val RESUME_TAIL_LINES = 1
     }
