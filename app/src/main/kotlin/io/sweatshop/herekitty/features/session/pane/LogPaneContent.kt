@@ -705,8 +705,11 @@ private fun StackedLogRow(
                 text = line.message,
                 style = console,
                 color = levelColor,
+                // softWrap only governs whether a long physical line wraps at the pane's edge or
+                // scrolls sideways; a message joined by LogcatParser (a stack trace, most often)
+                // carries its own embedded '\n's that must always break, so maxLines stays uncapped.
                 softWrap = columns.softWrap,
-                maxLines = if (columns.softWrap) Int.MAX_VALUE else 1,
+                maxLines = Int.MAX_VALUE,
                 overflow = TextOverflow.Clip,
             )
         }
@@ -809,8 +812,11 @@ private fun ColumnarLogRow(
             text = line.message,
             style = console,
             color = levelColor,
+            // softWrap only governs whether a long physical line wraps at the pane's edge or
+            // scrolls sideways; a message joined by LogcatParser (a stack trace, most often)
+            // carries its own embedded '\n's that must always break, so maxLines stays uncapped.
             softWrap = columns.softWrap,
-            maxLines = if (columns.softWrap) Int.MAX_VALUE else 1,
+            maxLines = Int.MAX_VALUE,
             overflow = TextOverflow.Clip,
             modifier = if (columns.softWrap) Modifier.weight(1f) else Modifier,
         )
