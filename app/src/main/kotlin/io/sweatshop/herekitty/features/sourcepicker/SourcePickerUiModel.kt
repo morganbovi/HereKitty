@@ -3,6 +3,7 @@ package io.sweatshop.herekitty.features.sourcepicker
 import io.sweatshop.herekitty.domain.features.devices.model.AdbDevice
 import io.sweatshop.herekitty.domain.features.devices.model.AdbServerState
 import io.sweatshop.herekitty.domain.features.devices.model.AdbToolsState
+import io.sweatshop.herekitty.domain.features.logs.model.LastSessionInfo
 import io.sweatshop.herekitty.domain.features.views.model.ViewConfig
 import io.sweatshop.herekitty.ui.presenter.EventHandler
 import java.nio.file.Path
@@ -13,6 +14,8 @@ data class SourcePickerUiModel(
     val toolsState: AdbToolsState,
     val busySerials: Set<String>,
     val pendingView: ViewConfig,
+    /** Devices whose last capture is still on disk from a clean quit, offered alongside device/file. */
+    val lastSessions: List<LastSessionInfo>,
     val canClose: Boolean,
     val eventHandler: EventHandler<Event>,
 ) {

@@ -10,6 +10,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import io.sweatshop.herekitty.domain.base.launchCoroutine
 import io.sweatshop.herekitty.domain.features.devices.repository.DeviceRepository
+import io.sweatshop.herekitty.domain.features.lifecycle.repository.AppLifecycleRepository
+import io.sweatshop.herekitty.domain.features.logs.repository.LastSessionRepository
 import io.sweatshop.herekitty.domain.features.logs.repository.LogSessionRepository
 import io.sweatshop.herekitty.domain.features.views.model.ViewConfig
 import io.sweatshop.herekitty.domain.features.settings.repository.SettingsRepository
@@ -53,6 +55,8 @@ class WorkspacePresenter(
     private val layoutRepository: WorkspaceLayoutRepository,
     private val deviceRepository: DeviceRepository,
     private val settingsRepository: SettingsRepository,
+    private val lastSessionRepository: LastSessionRepository,
+    private val lifecycleRepository: AppLifecycleRepository,
 ) {
 
     @Composable
@@ -90,6 +94,10 @@ class WorkspacePresenter(
         }
         var hasReattached by remember { mutableStateOf(restored.isEmpty) }
 
+        // Read once, and reset in the same call: if this run never reaches markCleanExit, the next
+        // launch sees false without anyone having to remember to leave a "still running" mark behind.
+        val wasCleanExit = remember { lifecycleRepository.consumeLastExitWasClean() }
+
         // The layout comes back before adb has said what is plugged in, so reattaching waits for the
         // first device list rather than guessing.
         LaunchedEffect(restored) {
@@ -106,17 +114,37 @@ class WorkspacePresenter(
             hasReattached = true
 
             val bySerial = available.orEmpty().filter { it.state.canStreamLogs }.associateBy { it.serial }
-            if (bySerial.isEmpty()) return@LaunchedEffect
 
             var slotIndex = 0
+            val missing = mutableListOf<Pair<NodeId, String>>()
             tabs = tabs.map { tab ->
                 tab.copy(
                     root = tab.root.mapSlots { slot ->
-                        val device = wanted.getOrNull(slotIndex++)?.let { bySerial[it] }
-                        if (device == null) slot else slot.copy(session = sessionRepository.open(device))
+                        val serial = wanted.getOrNull(slotIndex++)
+                        val device = serial?.let { bySerial[it] }
+                        when {
+                            device != null -> slot.copy(session = sessionRepository.open(device))
+                            serial != null -> { missing += slot.id to serial; slot }
+                            else -> slot
+                        }
                     },
                 )
             }
+            // Nothing crashed, so reattaching is as far as this goes: the slot lands on the source
+            // picker, which finds the cache back on its own — offered as a choice, not forced here.
+            if (missing.isEmpty() || wasCleanExit) return@LaunchedEffect
+
+            // The previous run never reached its own quit path, so this is a crash recovery, not a
+            // choice the user gets to sit through — resume silently, the way a browser would.
+            var resumedAny = false
+            missing.forEach { (slotId, serial) ->
+                val info = lastSessionRepository.find(serial) ?: return@forEach
+                sessionRepository.openRecording(info.path).onSuccess { session ->
+                    resumedAny = true
+                    tabs = tabs.map { it.copy(root = it.root.updateSlot(slotId) { s -> s.copy(session = session) }) }
+                }
+            }
+            if (resumedAny) raise("Reopened your last session after HereKitty quit unexpectedly")
         }
 
         // Persist whatever the layout currently is, a beat after it settles.

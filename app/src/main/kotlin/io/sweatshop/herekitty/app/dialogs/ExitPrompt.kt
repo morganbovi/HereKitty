@@ -35,7 +35,8 @@ fun ExitPrompt(onCancel: () -> Unit, onExit: (stopAsking: Boolean) -> Unit) {
             Text("Quit HereKitty?", style = JewelTheme.typography.regular)
 
             Text(
-                text = "Any recording you have not exported is lost. Saved views and the layout come back next time.",
+                text = "Each open device's session is kept for next time. Only a manual export saves " +
+                    "it as a file you can share.",
                 style = JewelTheme.typography.small,
                 color = JewelTheme.globalColors.text.info,
             )
