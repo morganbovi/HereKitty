@@ -10,6 +10,13 @@ private val timeOfDay: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss
 fun formatTimeOfDay(epochMillis: Long): String =
     if (epochMillis <= 0L) "--:--:--.---" else timeOfDay.format(Instant.ofEpochMilli(epochMillis))
 
+private val captureDate: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("MMM d, yyyy · h:mm a", Locale.US).withZone(ZoneId.systemDefault())
+
+/** A day-and-time stamp, for something captured once rather than a log line's within-a-run timestamp. */
+fun formatCaptureDate(epochMillis: Long): String =
+    if (epochMillis <= 0L) "Unknown date" else captureDate.format(Instant.ofEpochMilli(epochMillis))
+
 fun formatBytes(bytes: Long): String = when {
     bytes >= GIB -> String.format(Locale.US, "%.1f GB", bytes / GIB.toDouble())
     bytes >= MIB -> "${bytes / MIB} MB"

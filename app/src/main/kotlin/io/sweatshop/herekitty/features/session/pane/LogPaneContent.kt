@@ -47,7 +47,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.sweatshop.herekitty.domain.features.logs.model.LogLevel
 import io.sweatshop.herekitty.domain.features.logs.model.LogLine
+import io.sweatshop.herekitty.domain.features.logs.model.SessionEvent
 import io.sweatshop.herekitty.domain.features.logs.repository.LogSession
+import io.sweatshop.herekitty.domain.features.logs.repository.LogSnapshot
 import io.sweatshop.herekitty.domain.features.settings.model.LogColumns
 import io.sweatshop.herekitty.domain.features.settings.model.LogLineLayout
 import io.sweatshop.herekitty.domain.features.views.model.LayoutOrientation
@@ -56,6 +58,7 @@ import io.sweatshop.herekitty.domain.features.views.model.PaneId
 import io.sweatshop.herekitty.features.session.SplitSide
 import io.sweatshop.herekitty.features.session.pane.LogPaneUiModel.Event.OnCloseClicked
 import io.sweatshop.herekitty.features.session.pane.LogPaneUiModel.Event.OnCollapseDuplicatesToggled
+import io.sweatshop.herekitty.features.session.pane.LogPaneUiModel.Event.OnCrashesFilterSelected
 import io.sweatshop.herekitty.features.session.pane.LogPaneUiModel.Event.OnFilterCleared
 import io.sweatshop.herekitty.features.session.pane.LogPaneUiModel.Event.OnFollowTailToggled
 import io.sweatshop.herekitty.features.session.pane.LogPaneUiModel.Event.OnMatchCaseToggled
@@ -96,7 +99,8 @@ import org.jetbrains.jewel.ui.typography
 import org.koin.compose.koinInject
 
 
-private val LEVEL_LABELS = LogLevel.entries.map { "${it.letter}+" }
+private val LEVEL_LABELS = LogLevel.entries.map { it.label }
+private val LEVEL_DROPDOWN_ITEMS = LEVEL_LABELS + "Crashes"
 
 @Composable
 fun LogPaneContent(
@@ -129,7 +133,7 @@ fun LogPaneContent(
     Column(modifier.fillMaxSize()) {
         PaneToolbar(uiModel, grip)
         SearchRow(uiModel)
-        if (uiModel.filter.tags.isNotEmpty()) SelectedTagRow(uiModel, tagGrip)
+        if (uiModel.filter.tags.isNotEmpty() && !uiModel.isCrashesFilterActive) SelectedTagRow(uiModel, tagGrip)
         Divider(Orientation.Horizontal)
         LogLines(uiModel, Modifier.weight(1f))
         Divider(Orientation.Horizontal)
@@ -166,49 +170,57 @@ private fun PaneToolbar(uiModel: LogPaneUiModel, grip: ReorderGrip) {
             }
         }
 
-        Box {
-            Tooltip(tooltip = { Text("Filter by tags seen this session") }) {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(3.dp))
-                        .clickable { uiModel.eventHandler(OnTagPickerOpened) }
-                        .padding(horizontal = 4.dp, vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(3.dp),
-                ) {
-                    Icon(AllIconsKeys.Nodes.Tag, contentDescription = "Tags")
-                    Text(
-                        text = uiModel.filter.describesTags.ifEmpty { "All tags" },
-                        style = JewelTheme.typography.small,
-                        color = if (uiModel.filter.tags.isEmpty()) {
-                            JewelTheme.globalColors.text.info
-                        } else {
-                            JewelTheme.globalColors.text.normal
-                        },
-                        maxLines = 1,
-                        softWrap = false,
-                    )
-                    Icon(AllIconsKeys.General.ChevronDown, contentDescription = null)
+        if (!uiModel.isCrashesFilterActive) {
+            Box {
+                Tooltip(tooltip = { Text("Filter by tags seen this session") }) {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(3.dp))
+                            .clickable { uiModel.eventHandler(OnTagPickerOpened) }
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    ) {
+                        Icon(AllIconsKeys.Nodes.Tag, contentDescription = "Tags")
+                        Text(
+                            text = uiModel.filter.describesTags.ifEmpty { "All tags" },
+                            style = JewelTheme.typography.small,
+                            color = if (uiModel.filter.tags.isEmpty()) {
+                                JewelTheme.globalColors.text.info
+                            } else {
+                                JewelTheme.globalColors.text.normal
+                            },
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                        Icon(AllIconsKeys.General.ChevronDown, contentDescription = null)
+                    }
                 }
-            }
 
-            if (uiModel.isTagPickerOpen) {
-                TagPickerPopup(
-                    tags = uiModel.availableTags,
-                    selectedTags = uiModel.filter.tags,
-                    onTagToggled = { uiModel.eventHandler(OnTagToggled(it)) },
-                    onDismissRequest = { uiModel.eventHandler(OnTagPickerDismissed) },
-                )
+                if (uiModel.isTagPickerOpen) {
+                    TagPickerPopup(
+                        tags = uiModel.availableTags,
+                        selectedTags = uiModel.filter.tags,
+                        onTagToggled = { uiModel.eventHandler(OnTagToggled(it)) },
+                        onDismissRequest = { uiModel.eventHandler(OnTagPickerDismissed) },
+                    )
+                }
             }
         }
 
         Box(Modifier.weight(1f))
 
-        Tooltip(tooltip = { Text("Minimum level") }) {
+        Tooltip(tooltip = { Text("Minimum level, or crashes only") }) {
             ListComboBox(
-                items = LEVEL_LABELS,
-                selectedIndex = uiModel.filter.minLevel.ordinal,
-                onSelectedItemChange = { uiModel.eventHandler(OnMinLevelChanged(LogLevel.entries[it])) },
+                items = LEVEL_DROPDOWN_ITEMS,
+                selectedIndex = if (uiModel.isCrashesFilterActive) LEVEL_LABELS.size else uiModel.filter.minLevel.ordinal,
+                onSelectedItemChange = { index ->
+                    if (index == LEVEL_LABELS.size) {
+                        uiModel.eventHandler(OnCrashesFilterSelected)
+                    } else {
+                        uiModel.eventHandler(OnMinLevelChanged(LogLevel.entries[index]))
+                    }
+                },
                 modifier = Modifier.width(LEVEL_SELECTOR_WIDTH),
             )
         }
@@ -473,6 +485,11 @@ private fun LogLines(uiModel: LogPaneUiModel, modifier: Modifier) {
     val density = LocalDensity.current
     val lineCount = uiModel.matchCount
 
+    // A session event has nothing to do with any pane's filter, so it is placed among these rows by
+    // sequence number rather than being indexed and matched the way a line is.
+    val placements = remember(uiModel.snapshot, uiModel.events) { placementsFor(uiModel.snapshot, uiModel.events) }
+    val totalCount = lineCount + placements.size
+
     // Wrapped lines already fit the pane, so sideways scrolling only applies when they do not.
     val scrollsSideways = !uiModel.columns.softWrap
 
@@ -489,8 +506,20 @@ private fun LogLines(uiModel: LogPaneUiModel, modifier: Modifier) {
     )
     var viewportWidth by remember { mutableStateOf(0.dp) }
 
-    LaunchedEffect(uiModel.revision, uiModel.followTail, lineCount) {
-        if (uiModel.followTail && lineCount > 0) listState.scrollToItem(lineCount - 1)
+    LaunchedEffect(uiModel.revision, uiModel.followTail, totalCount) {
+        if (uiModel.followTail && totalCount > 0) listState.scrollToItem(totalCount - 1)
+    }
+
+    val renderLine: @Composable (Int) -> Unit = { index ->
+        LogRow(
+            line = uiModel.snapshot[index],
+            previous = if (index > 0) uiModel.snapshot[index - 1] else null,
+            repeatCount = uiModel.snapshot.repeatCountAt(index),
+            columns = uiModel.columns,
+            console = console,
+            minWidth = if (scrollsSideways) viewportWidth else Dp.Unspecified,
+            tagActions = tagActions,
+        )
     }
 
     Box(
@@ -516,16 +545,24 @@ private fun LogLines(uiModel: LogPaneUiModel, modifier: Modifier) {
                 state = listState,
                 modifier = if (scrollsSideways) Modifier.fillMaxHeight() else Modifier.fillMaxSize(),
             ) {
-                items(lineCount) { index ->
-                    LogRow(
-                        line = uiModel.snapshot[index],
-                        previous = if (index > 0) uiModel.snapshot[index - 1] else null,
-                        repeatCount = uiModel.snapshot.repeatCountAt(index),
-                        columns = uiModel.columns,
-                        console = console,
-                        minWidth = if (scrollsSideways) viewportWidth else Dp.Unspecified,
-                        tagActions = tagActions,
-                    )
+                var from = 0
+                placements.forEach { (insertBeforeIndex, event) ->
+                    if (insertBeforeIndex > from) {
+                        val segmentStart = from
+                        items(insertBeforeIndex - segmentStart, key = { uiModel.snapshot.seqAt(segmentStart + it) }) {
+                            renderLine(segmentStart + it)
+                        }
+                    }
+                    item(key = "event-${event.seq}") {
+                        SessionEventRow(event, minWidth = if (scrollsSideways) viewportWidth else Dp.Unspecified)
+                    }
+                    from = insertBeforeIndex
+                }
+                if (from < lineCount) {
+                    val segmentStart = from
+                    items(lineCount - segmentStart, key = { uiModel.snapshot.seqAt(segmentStart + it) }) {
+                        renderLine(segmentStart + it)
+                    }
                 }
             }
         }
@@ -542,7 +579,7 @@ private fun LogLines(uiModel: LogPaneUiModel, modifier: Modifier) {
             )
         }
 
-        if (lineCount == 0) {
+        if (totalCount == 0) {
             Text(
                 text = if (uiModel.hasActiveFilter) "No lines match this filter" else "Waiting for lines",
                 style = JewelTheme.typography.small,
@@ -550,6 +587,57 @@ private fun LogLines(uiModel: LogPaneUiModel, modifier: Modifier) {
                 modifier = Modifier.align(Alignment.Center),
             )
         }
+    }
+}
+
+/**
+ * Where each session event lands among a pane's own matching lines, found by its sequence number
+ * rather than by filtering: an event is not a line, so it never competes with a pane's own filter.
+ *
+ * A marker only earns its place when this pane actually has a matching line after it and before the
+ * next marker (or the end) — otherwise it is dead weight in a narrowly filtered pane, where long
+ * stretches between matches would otherwise read as a wall of connection history and nothing else.
+ */
+private fun placementsFor(snapshot: LogSnapshot, events: List<SessionEvent>): List<Pair<Int, SessionEvent>> {
+    if (events.isEmpty()) return emptyList()
+    val placed = events.map { event ->
+        var low = 0
+        var high = snapshot.size
+        while (low < high) {
+            val mid = (low + high) / 2
+            if (snapshot.seqAt(mid) < event.seq) low = mid + 1 else high = mid
+        }
+        low to event
+    }
+    return placed.filterIndexed { i, (insertBeforeIndex, _) ->
+        val nextBoundary = placed.getOrNull(i + 1)?.first ?: snapshot.size
+        nextBoundary > insertBeforeIndex
+    }
+}
+
+@Composable
+private fun SessionEventRow(event: SessionEvent, minWidth: Dp) {
+    val scrollsSideways = minWidth != Dp.Unspecified
+
+    Row(
+        modifier = Modifier
+            // A bare fillMaxWidth() collapses to content size inside the horizontal-scroll container
+            // every other row already routes around the same way, via a viewport-wide floor instead.
+            .then(if (scrollsSideways) Modifier.widthIn(min = minWidth) else Modifier.fillMaxWidth())
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Divider(Orientation.Horizontal, modifier = Modifier.weight(1f))
+        Text(
+            text = "${event.kind.label} · ${formatTimeOfDay(event.timestampMillis)}",
+            style = JewelTheme.typography.regular,
+            fontWeight = FontWeight.Medium,
+            color = JewelTheme.globalColors.text.info,
+            maxLines = 1,
+            softWrap = false,
+        )
+        Divider(Orientation.Horizontal, modifier = Modifier.weight(1f))
     }
 }
 
@@ -705,8 +793,11 @@ private fun StackedLogRow(
                 text = line.message,
                 style = console,
                 color = levelColor,
+                // softWrap only governs whether a long physical line wraps at the pane's edge or
+                // scrolls sideways; a message joined by LogcatParser (a stack trace, most often)
+                // carries its own embedded '\n's that must always break, so maxLines stays uncapped.
                 softWrap = columns.softWrap,
-                maxLines = if (columns.softWrap) Int.MAX_VALUE else 1,
+                maxLines = Int.MAX_VALUE,
                 overflow = TextOverflow.Clip,
             )
         }
@@ -809,8 +900,11 @@ private fun ColumnarLogRow(
             text = line.message,
             style = console,
             color = levelColor,
+            // softWrap only governs whether a long physical line wraps at the pane's edge or
+            // scrolls sideways; a message joined by LogcatParser (a stack trace, most often)
+            // carries its own embedded '\n's that must always break, so maxLines stays uncapped.
             softWrap = columns.softWrap,
-            maxLines = if (columns.softWrap) Int.MAX_VALUE else 1,
+            maxLines = Int.MAX_VALUE,
             overflow = TextOverflow.Clip,
             modifier = if (columns.softWrap) Modifier.weight(1f) else Modifier,
         )
@@ -865,7 +959,7 @@ private fun PaneStatusBar(uiModel: LogPaneUiModel) {
 
 private val TOOLBAR_HEIGHT = 26.dp
 private val STATUS_HEIGHT = 18.dp
-private val LEVEL_SELECTOR_WIDTH = 62.dp
+private val LEVEL_SELECTOR_WIDTH = 100.dp
 private val TAG_COLUMN_WIDTH = 96.dp
 private val PROCESS_COLUMN_WIDTH = 68.dp
 private const val METADATA_TEXT_SCALE = 0.82f

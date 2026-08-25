@@ -3,6 +3,7 @@ package io.sweatshop.herekitty.repository.logs
 import io.sweatshop.herekitty.domain.features.logs.model.BufferStats
 import io.sweatshop.herekitty.domain.features.logs.model.ConnectionState
 import io.sweatshop.herekitty.domain.features.logs.model.LogLine
+import io.sweatshop.herekitty.domain.features.logs.model.SessionEvent
 import io.sweatshop.herekitty.domain.features.logs.model.TagStats
 import io.sweatshop.herekitty.domain.features.logs.repository.LogSession
 import io.sweatshop.herekitty.domain.features.logs.repository.LogSnapshot
@@ -13,6 +14,7 @@ import io.sweatshop.herekitty.domain.features.views.model.ViewConfig
 import io.sweatshop.herekitty.repository.views.ViewConfigCodec
 import java.nio.file.Path
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -48,7 +50,9 @@ internal abstract class BaseLogSession(
 
     protected val scope = CoroutineScope(parentScope.coroutineContext + SupervisorJob())
 
-    private var sequence = 0L
+    // Atomic rather than a plain var: the capture coroutine draws from this for every line, and
+    // recordEvent() now also draws from it from whatever thread a pause is toggled on.
+    private val sequence = AtomicLong(0L)
 
     @Volatile private var pendingRevision = false
     private var lastTagPublishNanos = 0L
@@ -62,15 +66,22 @@ internal abstract class BaseLogSession(
     private val mutableTags = MutableStateFlow<List<TagStats>>(emptyList())
     override val tags: StateFlow<List<TagStats>> = mutableTags.asStateFlow()
 
+    private val mutableEvents = MutableStateFlow<List<SessionEvent>>(emptyList())
+    override val events: StateFlow<List<SessionEvent>> = mutableEvents.asStateFlow()
+
     init {
         launchIngest()
         launchRevisionTicker()
     }
 
-    /** Called from a single producer coroutine, so the counter needs no synchronisation. */
-    protected fun nextSequence(): Long = sequence++
+    protected fun nextSequence(): Long = sequence.getAndIncrement()
 
     protected suspend fun submit(line: LogLine) = incoming.send(line)
+
+    /** Appends a lifecycle marker, sharing the line sequencer so it sorts in among real lines. */
+    protected fun recordEvent(kind: SessionEvent.Kind) {
+        mutableEvents.value = mutableEvents.value + SessionEvent(nextSequence(), System.currentTimeMillis(), kind)
+    }
 
     override fun openView(spec: LogViewSpec): LogView {
         val view = LogViewImpl(

@@ -5,11 +5,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.DpSize
 import java.awt.Desktop
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
@@ -17,6 +20,9 @@ import io.sweatshop.herekitty.app.AppTitleBarContent
 import io.sweatshop.herekitty.app.HereKittyApp
 import io.sweatshop.herekitty.app.dialogs.ExitPrompt
 import io.sweatshop.herekitty.di.appModule
+import io.sweatshop.herekitty.domain.features.lifecycle.repository.AppLifecycleRepository
+import io.sweatshop.herekitty.domain.features.logs.repository.LastSessionRepository
+import io.sweatshop.herekitty.domain.features.logs.repository.LogSessionRepository
 import io.sweatshop.herekitty.domain.features.settings.repository.SettingsRepository
 import io.sweatshop.herekitty.ui.keyboard.rememberFontScaleShortcuts
 import io.sweatshop.herekitty.ui.theme.HereKittyTheme
@@ -31,11 +37,28 @@ fun main() {
 
     application {
         val settings = koinInject<SettingsRepository>()
+        val sessionRepository = koinInject<LogSessionRepository>()
+        val lastSessionRepository = koinInject<LastSessionRepository>()
+        val lifecycleRepository = koinInject<AppLifecycleRepository>()
         val confirmExit by settings.confirmExit.collectAsState()
         val themeMode by settings.themeMode.collectAsState()
         var isExitPromptOpen by remember { mutableStateOf(false) }
         val settingsRequests = remember {
             MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+        }
+        val quitScope = rememberCoroutineScope()
+
+        // Every live device session is snapshotted before the window actually goes, so a slot whose
+        // device is gone next launch can still open what it last held. Marked clean last, since that
+        // is the one bit that must never be true unless this actually finished.
+        fun quit() {
+            quitScope.launch {
+                withTimeoutOrNull(QUIT_SAVE_TIMEOUT_MILLIS) {
+                    lastSessionRepository.saveAll(sessionRepository.sessions.value)
+                }
+                lifecycleRepository.markCleanExit()
+                exitApplication()
+            }
         }
 
         // Puts a working "Settings…" in the macOS application menu.
@@ -50,8 +73,8 @@ fun main() {
 
         HereKittyTheme(isDark = resolveDarkTheme(themeMode)) {
             DecoratedWindow(
-                // Quitting drops every unexported recording, so it is worth a question by default.
-                onCloseRequest = { if (confirmExit) isExitPromptOpen = true else exitApplication() },
+                // Only a manual export survives as a shareable file, so it is worth a question by default.
+                onCloseRequest = { if (confirmExit) isExitPromptOpen = true else quit() },
                 state = rememberWindowState(size = DpSize(1600.dp, 920.dp)),
                 title = "HereKitty",
                 icon = AppIcon.painter,
@@ -69,7 +92,7 @@ fun main() {
                         onCancel = { isExitPromptOpen = false },
                         onExit = { stopAsking ->
                             if (stopAsking) settings.setConfirmExit(false)
-                            exitApplication()
+                            quit()
                         },
                     )
                 }
@@ -77,3 +100,5 @@ fun main() {
         }
     }
 }
+
+private const val QUIT_SAVE_TIMEOUT_MILLIS = 3_000L

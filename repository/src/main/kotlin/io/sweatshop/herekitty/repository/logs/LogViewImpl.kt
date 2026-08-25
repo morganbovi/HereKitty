@@ -79,6 +79,8 @@ internal class IndexedLogSnapshot(
 
     override fun repeatCountAt(index: Int): Int = this.index.countAt(index)
 
+    override fun seqAt(index: Int): Long = this.index.seqAt(index)
+
     private companion object {
         val EVICTED = LogLine(
             seq = -1L,

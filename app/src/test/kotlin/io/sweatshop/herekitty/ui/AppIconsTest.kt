@@ -22,6 +22,7 @@ class AppIconsTest {
         "General.BalloonInformation" to AllIconsKeys.General.BalloonInformation,
         "General.BalloonError" to AllIconsKeys.General.BalloonError,
         "General.Mouse" to AllIconsKeys.General.Mouse,
+        "General.History" to AllIconsKeys.General.History,
         "General.Drag" to AllIconsKeys.General.Drag,
         "Nodes.Tag" to AllIconsKeys.Nodes.Tag,
         "Actions.Search" to AllIconsKeys.Actions.Search,
