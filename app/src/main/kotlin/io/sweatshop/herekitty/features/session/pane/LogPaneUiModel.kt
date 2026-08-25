@@ -32,6 +32,9 @@ data class LogPaneUiModel(
 
     val hasActiveFilter: Boolean get() = !filter.isPassThrough
 
+    /** The level dropdown's "Crashes" entry is really this tag, not a level. */
+    val isCrashesFilterActive: Boolean get() = filter.tags == CRASH_TAGS
+
     /** A tag can only be pulled out when the pane is watching more than one. */
     val canSplitTags: Boolean get() = filter.tags.size > 1
 
@@ -40,7 +43,11 @@ data class LogPaneUiModel(
     /** What this pane is narrowed to, spelled out so the AND between the parts is visible. */
     val filterSummary: String
         get() = buildList {
-            if (filter.tags.isNotEmpty()) add(filter.tags.joinToString(", ") { it.trim() })
+            if (isCrashesFilterActive) {
+                add("Crashes")
+            } else if (filter.tags.isNotEmpty()) {
+                add(filter.tags.joinToString(", ") { it.trim() })
+            }
             if (filter.query.isNotBlank()) add("\"${filter.query}\"")
             if (filter.minLevel != LogLevel.VERBOSE) add("${filter.minLevel.letter} and above")
         }.joinToString(" and ")
@@ -88,6 +95,13 @@ data class LogPaneUiModel(
 
         data object OnFilterCleared : Event
 
+        data object OnCrashesFilterSelected : Event
+
         data object OnCloseClicked : Event
+    }
+
+    companion object {
+        /** Real crashes are logged by the platform's own runtime under this exact tag. */
+        val CRASH_TAGS = setOf("AndroidRuntime")
     }
 }

@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import io.sweatshop.herekitty.domain.features.logs.model.LogFilter
+import io.sweatshop.herekitty.domain.features.logs.model.LogLevel
 import io.sweatshop.herekitty.domain.features.logs.repository.LogSession
 import io.sweatshop.herekitty.domain.features.logs.repository.LogViewSpec
 import io.sweatshop.herekitty.domain.features.settings.repository.SettingsRepository
@@ -18,6 +19,7 @@ import io.sweatshop.herekitty.domain.features.views.model.PaneId
 import io.sweatshop.herekitty.features.session.SplitSide
 import io.sweatshop.herekitty.features.session.pane.LogPaneUiModel.Event.OnCloseClicked
 import io.sweatshop.herekitty.features.session.pane.LogPaneUiModel.Event.OnCollapseDuplicatesToggled
+import io.sweatshop.herekitty.features.session.pane.LogPaneUiModel.Event.OnCrashesFilterSelected
 import io.sweatshop.herekitty.features.session.pane.LogPaneUiModel.Event.OnFilterCleared
 import io.sweatshop.herekitty.features.session.pane.LogPaneUiModel.Event.OnFollowTailToggled
 import io.sweatshop.herekitty.features.session.pane.LogPaneUiModel.Event.OnMatchCaseToggled
@@ -127,7 +129,16 @@ class LogPanePresenter(private val settingsRepository: SettingsRepository) {
                         filter.copy(tags = tags)
                     }
 
-                    is OnMinLevelChanged -> changeFilter { it.copy(minLevel = event.level) }
+                    is OnMinLevelChanged -> changeFilter {
+                        // Picking a level exits crash mode too, since the two share one dropdown.
+                        val tags = if (it.tags == LogPaneUiModel.CRASH_TAGS) emptySet() else it.tags
+                        it.copy(minLevel = event.level, tags = tags)
+                    }
+                    OnCrashesFilterSelected -> {
+                        // The tag popup has nothing to show once tags are no longer user-editable.
+                        isTagPickerOpen = false
+                        changeFilter { it.copy(tags = LogPaneUiModel.CRASH_TAGS, minLevel = LogLevel.VERBOSE) }
+                    }
                     OnMatchCaseToggled -> changeFilter { it.copy(matchCase = !it.matchCase) }
                     OnRegexToggled -> changeFilter { it.copy(useRegex = !it.useRegex) }
 

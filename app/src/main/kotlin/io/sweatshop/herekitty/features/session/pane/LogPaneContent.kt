@@ -56,6 +56,7 @@ import io.sweatshop.herekitty.domain.features.views.model.PaneId
 import io.sweatshop.herekitty.features.session.SplitSide
 import io.sweatshop.herekitty.features.session.pane.LogPaneUiModel.Event.OnCloseClicked
 import io.sweatshop.herekitty.features.session.pane.LogPaneUiModel.Event.OnCollapseDuplicatesToggled
+import io.sweatshop.herekitty.features.session.pane.LogPaneUiModel.Event.OnCrashesFilterSelected
 import io.sweatshop.herekitty.features.session.pane.LogPaneUiModel.Event.OnFilterCleared
 import io.sweatshop.herekitty.features.session.pane.LogPaneUiModel.Event.OnFollowTailToggled
 import io.sweatshop.herekitty.features.session.pane.LogPaneUiModel.Event.OnMatchCaseToggled
@@ -96,7 +97,8 @@ import org.jetbrains.jewel.ui.typography
 import org.koin.compose.koinInject
 
 
-private val LEVEL_LABELS = LogLevel.entries.map { "${it.letter}+" }
+private val LEVEL_LABELS = LogLevel.entries.map { it.label }
+private val LEVEL_DROPDOWN_ITEMS = LEVEL_LABELS + "Crashes"
 
 @Composable
 fun LogPaneContent(
@@ -129,7 +131,7 @@ fun LogPaneContent(
     Column(modifier.fillMaxSize()) {
         PaneToolbar(uiModel, grip)
         SearchRow(uiModel)
-        if (uiModel.filter.tags.isNotEmpty()) SelectedTagRow(uiModel, tagGrip)
+        if (uiModel.filter.tags.isNotEmpty() && !uiModel.isCrashesFilterActive) SelectedTagRow(uiModel, tagGrip)
         Divider(Orientation.Horizontal)
         LogLines(uiModel, Modifier.weight(1f))
         Divider(Orientation.Horizontal)
@@ -166,49 +168,57 @@ private fun PaneToolbar(uiModel: LogPaneUiModel, grip: ReorderGrip) {
             }
         }
 
-        Box {
-            Tooltip(tooltip = { Text("Filter by tags seen this session") }) {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(3.dp))
-                        .clickable { uiModel.eventHandler(OnTagPickerOpened) }
-                        .padding(horizontal = 4.dp, vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(3.dp),
-                ) {
-                    Icon(AllIconsKeys.Nodes.Tag, contentDescription = "Tags")
-                    Text(
-                        text = uiModel.filter.describesTags.ifEmpty { "All tags" },
-                        style = JewelTheme.typography.small,
-                        color = if (uiModel.filter.tags.isEmpty()) {
-                            JewelTheme.globalColors.text.info
-                        } else {
-                            JewelTheme.globalColors.text.normal
-                        },
-                        maxLines = 1,
-                        softWrap = false,
-                    )
-                    Icon(AllIconsKeys.General.ChevronDown, contentDescription = null)
+        if (!uiModel.isCrashesFilterActive) {
+            Box {
+                Tooltip(tooltip = { Text("Filter by tags seen this session") }) {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(3.dp))
+                            .clickable { uiModel.eventHandler(OnTagPickerOpened) }
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    ) {
+                        Icon(AllIconsKeys.Nodes.Tag, contentDescription = "Tags")
+                        Text(
+                            text = uiModel.filter.describesTags.ifEmpty { "All tags" },
+                            style = JewelTheme.typography.small,
+                            color = if (uiModel.filter.tags.isEmpty()) {
+                                JewelTheme.globalColors.text.info
+                            } else {
+                                JewelTheme.globalColors.text.normal
+                            },
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                        Icon(AllIconsKeys.General.ChevronDown, contentDescription = null)
+                    }
                 }
-            }
 
-            if (uiModel.isTagPickerOpen) {
-                TagPickerPopup(
-                    tags = uiModel.availableTags,
-                    selectedTags = uiModel.filter.tags,
-                    onTagToggled = { uiModel.eventHandler(OnTagToggled(it)) },
-                    onDismissRequest = { uiModel.eventHandler(OnTagPickerDismissed) },
-                )
+                if (uiModel.isTagPickerOpen) {
+                    TagPickerPopup(
+                        tags = uiModel.availableTags,
+                        selectedTags = uiModel.filter.tags,
+                        onTagToggled = { uiModel.eventHandler(OnTagToggled(it)) },
+                        onDismissRequest = { uiModel.eventHandler(OnTagPickerDismissed) },
+                    )
+                }
             }
         }
 
         Box(Modifier.weight(1f))
 
-        Tooltip(tooltip = { Text("Minimum level") }) {
+        Tooltip(tooltip = { Text("Minimum level, or crashes only") }) {
             ListComboBox(
-                items = LEVEL_LABELS,
-                selectedIndex = uiModel.filter.minLevel.ordinal,
-                onSelectedItemChange = { uiModel.eventHandler(OnMinLevelChanged(LogLevel.entries[it])) },
+                items = LEVEL_DROPDOWN_ITEMS,
+                selectedIndex = if (uiModel.isCrashesFilterActive) LEVEL_LABELS.size else uiModel.filter.minLevel.ordinal,
+                onSelectedItemChange = { index ->
+                    if (index == LEVEL_LABELS.size) {
+                        uiModel.eventHandler(OnCrashesFilterSelected)
+                    } else {
+                        uiModel.eventHandler(OnMinLevelChanged(LogLevel.entries[index]))
+                    }
+                },
                 modifier = Modifier.width(LEVEL_SELECTOR_WIDTH),
             )
         }
@@ -871,7 +881,7 @@ private fun PaneStatusBar(uiModel: LogPaneUiModel) {
 
 private val TOOLBAR_HEIGHT = 26.dp
 private val STATUS_HEIGHT = 18.dp
-private val LEVEL_SELECTOR_WIDTH = 62.dp
+private val LEVEL_SELECTOR_WIDTH = 100.dp
 private val TAG_COLUMN_WIDTH = 96.dp
 private val PROCESS_COLUMN_WIDTH = 68.dp
 private const val METADATA_TEXT_SCALE = 0.82f
