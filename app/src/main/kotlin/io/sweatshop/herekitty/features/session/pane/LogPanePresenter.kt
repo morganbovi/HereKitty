@@ -73,6 +73,8 @@ class LogPanePresenter(private val settingsRepository: SettingsRepository) {
         val events by session.events.collectAsState()
         val columns by settingsRepository.logColumns.collectAsState()
         val fontScale by settingsRepository.logFontScale.collectAsState()
+        val selectMessageOnly by settingsRepository.selectMessageOnly.collectAsState()
+        val isCompactView by settingsRepository.isCompactView.collectAsState()
 
         var queryInput by remember { mutableStateOf(config.filter.query) }
         var isTagPickerOpen by remember { mutableStateOf(false) }
@@ -111,6 +113,8 @@ class LogPanePresenter(private val settingsRepository: SettingsRepository) {
             collapseDuplicates = config.collapseDuplicates,
             columns = effectiveColumnsFor(columns, config.filter),
             fontScale = fontScale,
+            selectMessageOnly = selectMessageOnly,
+            isCompactView = isCompactView,
             availableTags = availableTags,
             isTagPickerOpen = isTagPickerOpen,
             canClose = canClose,

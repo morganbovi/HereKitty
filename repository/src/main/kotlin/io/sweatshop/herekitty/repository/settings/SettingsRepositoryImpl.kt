@@ -57,6 +57,14 @@ class SettingsRepositoryImpl(private val appScope: AppScope) : SettingsRepositor
         MutableStateFlow(stored.notificationDismissSeconds.coerceAtLeast(0))
     override val notificationDismissSeconds = _notificationDismissSeconds.asStateFlow()
 
+    private val _selectMessageOnly = MutableStateFlow(stored.selectMessageOnly)
+    override val selectMessageOnly = _selectMessageOnly.asStateFlow()
+
+    // In-memory only: setCompactView() deliberately never calls update(), so this is the one flow
+    // here that does not round-trip through Stored/settings.json.
+    private val _isCompactView = MutableStateFlow(false)
+    override val isCompactView = _isCompactView.asStateFlow()
+
     override fun setMemoryCapBytes(bytes: Long) = update { _memoryCapBytes.value = bytes }
 
     override fun setThemeMode(mode: ThemeMode) = update { _themeMode.value = mode }
@@ -78,6 +86,14 @@ class SettingsRepositoryImpl(private val appScope: AppScope) : SettingsRepositor
     override fun setNotificationDismissSeconds(seconds: Int) =
         update { _notificationDismissSeconds.value = seconds.coerceAtLeast(0) }
 
+    override fun setSelectMessageOnly(messageOnly: Boolean) =
+        update { _selectMessageOnly.value = messageOnly }
+
+    // No update() call: intentionally never written to settings.json — see isCompactView above.
+    override fun setCompactView(compact: Boolean) {
+        _isCompactView.value = compact
+    }
+
     private fun update(change: () -> Unit) {
         change()
         val snapshot = Stored.from(
@@ -90,6 +106,7 @@ class SettingsRepositoryImpl(private val appScope: AppScope) : SettingsRepositor
             confirmExit = _confirmExit.value,
             checkForUpdatesOnStartup = _checkForUpdatesOnStartup.value,
             notificationDismissSeconds = _notificationDismissSeconds.value,
+            selectMessageOnly = _selectMessageOnly.value,
         )
         appScope.launch(Dispatchers.IO) {
             runCatching {
@@ -125,6 +142,7 @@ class SettingsRepositoryImpl(private val appScope: AppScope) : SettingsRepositor
         val confirmExit: Boolean = true,
         val checkForUpdatesOnStartup: Boolean = true,
         val notificationDismissSeconds: Int = SettingsRepository.DEFAULT_NOTIFICATION_DISMISS_SECONDS,
+        val selectMessageOnly: Boolean = false,
     ) {
         fun toThemeMode(): ThemeMode = themeMode
             ?.let { name -> runCatching { ThemeMode.valueOf(name) }.getOrNull() }
@@ -150,6 +168,7 @@ class SettingsRepositoryImpl(private val appScope: AppScope) : SettingsRepositor
                 confirmExit: Boolean,
                 checkForUpdatesOnStartup: Boolean,
                 notificationDismissSeconds: Int,
+                selectMessageOnly: Boolean,
             ) = Stored(
                 memoryCapBytes = memoryCapBytes,
                 themeMode = themeMode.name,
@@ -158,6 +177,7 @@ class SettingsRepositoryImpl(private val appScope: AppScope) : SettingsRepositor
                 confirmExit = confirmExit,
                 checkForUpdatesOnStartup = checkForUpdatesOnStartup,
                 notificationDismissSeconds = notificationDismissSeconds,
+                selectMessageOnly = selectMessageOnly,
                 showTimestamps = columns.timestamp,
                 showLevel = columns.level,
                 showTag = columns.tag,

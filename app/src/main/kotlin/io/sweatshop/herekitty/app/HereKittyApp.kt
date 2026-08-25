@@ -69,8 +69,12 @@ fun HereKittyApp(
 
         Box(Modifier.fillMaxSize().background(JewelTheme.globalColors.panelBackground)) {
             Column(Modifier.fillMaxSize()) {
-                TabBar(workspaceUiModel)
-                Divider(Orientation.Horizontal)
+                // Only the window's own title bar survives compact view; everything this app draws
+                // itself, starting with the tab strip, goes to leave nothing but log content.
+                if (!uiModel.isCompactView) {
+                    TabBar(workspaceUiModel)
+                    Divider(Orientation.Horizontal)
+                }
                 WorkspaceContent(workspaceUiModel, Modifier.weight(1f))
             }
 

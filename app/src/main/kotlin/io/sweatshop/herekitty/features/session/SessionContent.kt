@@ -112,8 +112,10 @@ fun SessionContent(
     val dragState = remember { PaneDragState() }
 
     Column(modifier.fillMaxSize()) {
-        SessionToolbar(uiModel, viewActions, grip) { viewPendingDeletion = it }
-        Divider(Orientation.Horizontal)
+        if (!uiModel.isCompactView) {
+            SessionToolbar(uiModel, viewActions, grip) { viewPendingDeletion = it }
+            Divider(Orientation.Horizontal)
+        }
         PaneDragHost(dragState, Modifier.fillMaxSize()) {
             PaneTreeContent(uiModel, uiModel.root, dragState, Modifier.fillMaxSize())
         }

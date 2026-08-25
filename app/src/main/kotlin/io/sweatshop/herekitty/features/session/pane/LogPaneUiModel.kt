@@ -25,6 +25,9 @@ data class LogPaneUiModel(
     val collapseDuplicates: Boolean,
     val columns: LogColumns,
     val fontScale: Float,
+    /** Whether dragging to select text picks up only the message, not the whole row. */
+    val selectMessageOnly: Boolean,
+    val isCompactView: Boolean,
     val availableTags: List<TagStats>,
     val isTagPickerOpen: Boolean,
     val canClose: Boolean,
