@@ -108,7 +108,7 @@ private fun SourceCards(uiModel: SourcePickerUiModel, cardModifier: Modifier) {
 private fun SourceCard(
     icon: IconKey,
     title: String,
-    subtitle: String,
+    subtitle: String?,
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -123,11 +123,17 @@ private fun SourceCard(
             .background(JewelTheme.globalColors.outlines.focused.copy(alpha = 0.05f))
             .padding(CARD_PADDING),
         horizontalAlignment = Alignment.CenterHorizontally,
-        // The two groups below sit at fixed spots regardless of a taller sibling card stretching this
-        // one out, which is what keeps every card's icon in line with the others.
+        // content is invoked directly here rather than wrapped in its own child Column: when it emits
+        // more than one composable (a status line plus a button, with no subtitle above), SpaceBetween
+        // spreads the leftover space across every gap equally, which is what centers the status line
+        // between the title and the button instead of leaving it pinned to one side.
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(
+            modifier = Modifier.padding(bottom = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             Box(
                 modifier = Modifier
                     .size(ICON_BADGE_SIZE)
@@ -139,19 +145,17 @@ private fun SourceCard(
             }
 
             Text(title, style = JewelTheme.typography.regular, fontWeight = FontWeight.Bold)
-            Text(
-                text = subtitle,
-                style = JewelTheme.typography.small,
-                color = JewelTheme.globalColors.text.info,
-                textAlign = TextAlign.Center,
-            )
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = JewelTheme.typography.small,
+                    color = JewelTheme.globalColors.text.info,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
 
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            content = content,
-        )
+        content()
     }
 }
 
@@ -217,10 +221,13 @@ private fun LastSessionRow(info: LastSessionInfo, config: String, onClick: () ->
 
 @Composable
 private fun DeviceCard(uiModel: SourcePickerUiModel, modifier: Modifier = Modifier) {
+    // NoDevices carries its own status line ("No devices attached…" / "Starting the adb server"), so
+    // the generic subtitle would just repeat it — show one or the other, never both.
+    val hasOwnStatusLine = uiModel.unavailableReason == null && uiModel.devices.isEmpty()
     SourceCard(
         icon = AllIconsKeys.General.Mouse,
         title = "Choose a Device",
-        subtitle = "Pick a connected device to start a new session.",
+        subtitle = if (hasOwnStatusLine) null else "Pick a connected device to start a new session.",
         modifier = modifier,
     ) {
         when {
@@ -297,6 +304,9 @@ private fun DeviceRow(device: AdbDevice, isAlreadyOpen: Boolean, onClick: () -> 
 
 @Composable
 private fun NoDevices(uiModel: SourcePickerUiModel) {
+    // Left as two direct children (not wrapped in their own Column) so SourceCard's SpaceBetween
+    // splits the leftover space evenly around this line, centering it between the title and the
+    // button instead of pinning it to either.
     Text(
         text = if (uiModel.isStarting) {
             "Starting the adb server"
@@ -312,39 +322,44 @@ private fun NoDevices(uiModel: SourcePickerUiModel) {
 
 @Composable
 private fun AdbUnavailable(uiModel: SourcePickerUiModel) {
-    Text(
-        text = uiModel.installFailure ?: uiModel.unavailableReason.orEmpty(),
-        style = JewelTheme.typography.small,
-        color = colorFor(LogLevel.ERROR),
-        textAlign = TextAlign.Center,
-    )
-
-    if (uiModel.isInstallingTools) {
+    // Kept as one child of SourceCard's outer Column — unlike NoDevices, this can show several lines
+    // plus one or two buttons, and splitting that many pieces across SpaceBetween's gaps would scatter
+    // them instead of keeping them read as a single block.
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
-            text = if (uiModel.installProgress == null) "Unpacking the platform tools…" else "Downloading adb…",
+            text = uiModel.installFailure ?: uiModel.unavailableReason.orEmpty(),
             style = JewelTheme.typography.small,
-            color = JewelTheme.globalColors.text.info,
-        )
-        HorizontalProgressBar(
-            progress = uiModel.installProgress ?: 0f,
-            modifier = Modifier.width(PROGRESS_WIDTH),
-        )
-        return
-    }
-
-    if (uiModel.canInstallTools) {
-        Text(
-            text = "No adb on this machine. HereKitty can fetch Google's platform tools for you.",
-            style = JewelTheme.typography.small,
-            color = JewelTheme.globalColors.text.info,
+            color = colorFor(LogLevel.ERROR),
             textAlign = TextAlign.Center,
         )
-        DefaultButton(onClick = { uiModel.eventHandler(OnInstallToolsClicked) }) { Text("Install adb") }
-        OutlinedButton(onClick = { uiModel.eventHandler(OnRetryClicked) }) { Text("Refresh Devices") }
-        return
-    }
 
-    DefaultButton(onClick = { uiModel.eventHandler(OnRetryClicked) }) { Text("Refresh Devices") }
+        if (uiModel.isInstallingTools) {
+            Text(
+                text = if (uiModel.installProgress == null) "Unpacking the platform tools…" else "Downloading adb…",
+                style = JewelTheme.typography.small,
+                color = JewelTheme.globalColors.text.info,
+            )
+            HorizontalProgressBar(
+                progress = uiModel.installProgress ?: 0f,
+                modifier = Modifier.width(PROGRESS_WIDTH),
+            )
+            return@Column
+        }
+
+        if (uiModel.canInstallTools) {
+            Text(
+                text = "No adb on this machine. HereKitty can fetch Google's platform tools for you.",
+                style = JewelTheme.typography.small,
+                color = JewelTheme.globalColors.text.info,
+                textAlign = TextAlign.Center,
+            )
+            DefaultButton(onClick = { uiModel.eventHandler(OnInstallToolsClicked) }) { Text("Install adb") }
+            OutlinedButton(onClick = { uiModel.eventHandler(OnRetryClicked) }) { Text("Refresh Devices") }
+            return@Column
+        }
+
+        DefaultButton(onClick = { uiModel.eventHandler(OnRetryClicked) }) { Text("Refresh Devices") }
+    }
 }
 
 @Composable

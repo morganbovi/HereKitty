@@ -540,7 +540,19 @@ private fun LogLines(uiModel: LogPaneUiModel, modifier: Modifier) {
         modifier = modifier
             .fillMaxWidth()
             .onSizeChanged { viewportWidth = with(density) { it.width.toDp() } }
-            .onPointerEvent(PointerEventType.Scroll) { event ->
+            // Run in the Initial pass — before the LazyColumn's own scrollable handles the same
+            // event in Main — so a wheel scroll can be swallowed here while a selection drag is
+            // held down. SelectionContainer anchors its drag to specific Selectable rows by id;
+            // letting the list scroll mid-drag disposes whichever anchor row falls out of the
+            // viewport, and Compose Foundation's selection code then throws looking that id back up
+            // ("Cannot find value for key", from the primitive map it keys selectables by) instead
+            // of just failing to find it. Consuming the event keeps every row the drag touches
+            // composed until the mouse button comes back up.
+            .onPointerEvent(PointerEventType.Scroll, pass = PointerEventPass.Initial) { event ->
+                if (event.changes.any { it.pressed }) {
+                    event.changes.forEach { it.consume() }
+                    return@onPointerEvent
+                }
                 var deltaX = 0f
                 var deltaY = 0f
                 event.changes.forEach {
