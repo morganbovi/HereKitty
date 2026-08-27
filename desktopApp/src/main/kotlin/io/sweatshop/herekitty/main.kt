@@ -42,6 +42,7 @@ fun main() {
         val lastSessionRepository = koinInject<LastSessionRepository>()
         val lifecycleRepository = koinInject<AppLifecycleRepository>()
         val confirmExit by settings.confirmExit.collectAsState()
+        val sessions by sessionRepository.sessions.collectAsState()
         val themeMode by settings.themeMode.collectAsState()
         var isExitPromptOpen by remember { mutableStateOf(false) }
         val settingsRequests = remember {
@@ -75,8 +76,10 @@ fun main() {
 
         HereKittyTheme(isDark = resolveDarkTheme(themeMode)) {
             DecoratedWindow(
-                // Only a manual export survives as a shareable file, so it is worth a question by default.
-                onCloseRequest = { if (confirmExit) isExitPromptOpen = true else quit() },
+                // Only a manual export survives as a shareable file, so it is worth a question by
+                // default — but only when there is a live session that could still lose one. An empty
+                // source picker has nothing to lose, so quitting from it never prompts.
+                onCloseRequest = { if (confirmExit && sessions.isNotEmpty()) isExitPromptOpen = true else quit() },
                 state = rememberWindowState(size = DpSize(1600.dp, 920.dp)),
                 title = "HereKitty",
                 icon = AppIcon.painter,
