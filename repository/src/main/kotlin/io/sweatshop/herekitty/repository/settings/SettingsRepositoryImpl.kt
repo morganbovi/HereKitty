@@ -136,7 +136,7 @@ class SettingsRepositoryImpl(private val appScope: AppScope) : SettingsRepositor
         val showProcessIds: Boolean = false,
         val softWrapLines: Boolean = false,
         val restoreLastLayout: Boolean = true,
-        val lineLayout: String = LogLineLayout.Columns.name,
+        val lineLayout: String = LogLineLayout.Stacked.name,
         val logFontScale: Float = LogFontScale.Default,
         val confirmSessionClose: Boolean = true,
         val confirmExit: Boolean = true,
@@ -154,7 +154,7 @@ class SettingsRepositoryImpl(private val appScope: AppScope) : SettingsRepositor
             tag = showTag,
             processIds = showProcessIds,
             softWrap = softWrapLines,
-            layout = runCatching { LogLineLayout.valueOf(lineLayout) }.getOrDefault(LogLineLayout.Columns),
+            layout = runCatching { LogLineLayout.valueOf(lineLayout) }.getOrDefault(LogLineLayout.Stacked),
         )
 
         companion object {

@@ -19,5 +19,5 @@ data class LogColumns(
     val tag: Boolean = true,
     val processIds: Boolean = false,
     val softWrap: Boolean = false,
-    val layout: LogLineLayout = LogLineLayout.Columns,
+    val layout: LogLineLayout = LogLineLayout.Stacked,
 )
