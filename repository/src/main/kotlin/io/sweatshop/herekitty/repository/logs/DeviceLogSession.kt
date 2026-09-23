@@ -41,6 +41,8 @@ internal class DeviceLogSession(
     private var captureJob: Job? = null
     private var isPaused = false
 
+    @Volatile private var lastSeenTimestampMillis: Long? = null
+
     // Instance-level rather than local to launchCapture()'s coroutine: mutableConnection.value gets
     // overwritten to Connecting at the top of every retry, so it cannot itself say whether the stream
     // that is about to start is a first connect or a recovery — and a manual Reconnect click cancels
@@ -67,16 +69,16 @@ internal class DeviceLogSession(
             recordEvent(SessionEvent.Kind.Paused)
             wasPaused = true
         } else {
-            // Not a fresh open: dropping the -T limit here would replay the device's whole retained
-            // backlog into a pane that may have just been cleared, looking exactly like old lines
-            // coming back from the dead.
-            launchCapture(RESUME_TAIL_LINES)
+            // Not a fresh open: dropping the -T argument here would replay the device's *entire*
+            // retained backlog into a pane that may have just been cleared, looking exactly like
+            // old lines coming back from the dead -- resumePoint() picks up only what was missed.
+            launchCapture(resumePoint())
         }
     }
 
     override fun reconnect() {
         isPaused = false
-        launchCapture(RESUME_TAIL_LINES)
+        launchCapture(resumePoint())
     }
 
     override fun dispose() {
@@ -84,17 +86,17 @@ internal class DeviceLogSession(
         super.dispose()
     }
 
-    /** [initialTailLines] is only ever `null` for the very first connect, to show what's already there. */
-    private fun launchCapture(initialTailLines: Int? = null) {
+    /** [initialResumeFrom] is only ever `null` for the very first connect, to show what's already there. */
+    private fun launchCapture(initialResumeFrom: String? = null) {
         captureJob?.cancel()
         captureJob = scope.launch(Dispatchers.IO) {
-            var tailLines = initialTailLines
+            var resumeFrom = initialResumeFrom
 
             while (isActive) {
                 mutableConnection.value = ConnectionState.Connecting
                 try {
                     var streaming = false
-                    hostClient.streamLogcat(serial, tailLines).collect { rawLine ->
+                    hostClient.streamLogcat(serial, resumeFrom).collect { rawLine ->
                         if (!streaming) {
                             streaming = true
                             when {
@@ -109,9 +111,15 @@ internal class DeviceLogSession(
                             }
                             mutableConnection.value = ConnectionState.Streaming
                         }
-                        parser.accept(rawLine)?.let { submit(it) }
+                        parser.accept(rawLine)?.let {
+                            lastSeenTimestampMillis = it.timestampMillis
+                            submit(it)
+                        }
                     }
-                    parser.flush()?.let { submit(it) }
+                    parser.flush()?.let {
+                        lastSeenTimestampMillis = it.timestampMillis
+                        submit(it)
+                    }
                     markDisconnectedIfWasStreaming()
                     mutableConnection.value = ConnectionState.Waiting("Device disconnected")
                 } catch (e: CancellationException) {
@@ -125,11 +133,14 @@ internal class DeviceLogSession(
                     mutableConnection.value = ConnectionState.Waiting(e.message ?: "Waiting for $serial")
                 }
 
-                tailLines = RESUME_TAIL_LINES
+                resumeFrom = resumePoint()
                 delay(RECONNECT_DELAY_MILLIS)
             }
         }
     }
+
+    private fun resumePoint(): String =
+        lastSeenTimestampMillis?.let { formatEpochResumePoint(it + 1) } ?: FALLBACK_RESUME_TAIL
 
     private fun markDisconnectedIfWasStreaming() {
         if (mutableConnection.value != ConnectionState.Streaming) return
@@ -139,6 +150,12 @@ internal class DeviceLogSession(
 
     private companion object {
         const val RECONNECT_DELAY_MILLIS = 1_000L
-        const val RESUME_TAIL_LINES = 1
+        const val FALLBACK_RESUME_TAIL = "1"
+
+        fun formatEpochResumePoint(epochMillis: Long): String {
+            val seconds = epochMillis / 1_000
+            val millis = (epochMillis % 1_000).toString().padStart(3, '0')
+            return "$seconds.$millis"
+        }
     }
 }

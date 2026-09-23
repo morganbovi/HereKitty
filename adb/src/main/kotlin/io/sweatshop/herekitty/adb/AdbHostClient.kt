@@ -35,6 +35,24 @@ class AdbHostClient(private val endpoint: AdbEndpoint, private val binaryLocator
         connection.readFrame().trim().toIntOrNull(16) ?: 0
     }
 
+    suspend fun connect(hostPort: String): Result<String> = runCatching {
+        withConnection { connection ->
+            connection.request("$SERVICE_CONNECT$hostPort")
+            val message = connection.readFrame()
+            if (CONNECT_FAILURE_PREFIXES.any { message.startsWith(it, ignoreCase = true) }) {
+                throw AdbProtocolException(message)
+            }
+            message
+        }
+    }
+
+    suspend fun disconnect(hostPort: String): Result<String> = runCatching {
+        withConnection { connection ->
+            connection.request("$SERVICE_DISCONNECT$hostPort")
+            connection.readFrame()
+        }
+    }
+
     suspend fun ensureServerRunning(): Int {
         runCatching { serverVersion() }.onSuccess { return it }
 
@@ -82,13 +100,16 @@ class AdbHostClient(private val endpoint: AdbEndpoint, private val binaryLocator
     }
 
     /**
-     * Streams raw logcat output for one device. Pass [tailLines] when resuming after a disconnect so
-     * the device's existing buffer is not replayed into the session a second time.
+     * Streams raw logcat output for one device. [resumeFrom] is passed verbatim as logcat's own
+     * `-T` argument -- either a line count (`"1"`, the full-history dump is not replayed a second
+     * time) or, for resuming after a disconnect without losing what the device logged in the gap,
+     * an epoch `seconds.millis` timestamp (`-v epoch`'s own format, which `-T` also accepts) to
+     * pick logcat's ring buffer up from exactly where the session left off.
      */
-    fun streamLogcat(serial: String, tailLines: Int? = null): Flow<String> = channelFlow {
+    fun streamLogcat(serial: String, resumeFrom: String? = null): Flow<String> = channelFlow {
         withConnection { connection ->
             connection.request(serviceTransport(serial))
-            connection.request(serviceLogcat(tailLines))
+            connection.request(serviceLogcat(resumeFrom))
 
             BufferedReader(InputStreamReader(connection.stream, UTF_8), READER_BUFFER_BYTES).use { reader ->
                 while (isActive) {
@@ -135,15 +156,18 @@ class AdbHostClient(private val endpoint: AdbEndpoint, private val binaryLocator
         const val SERVICE_VERSION = "host:version"
         const val SERVICE_TRACK = "host:track-devices"
         const val SERVICE_TRACK_LONG = "host:track-devices-l"
+        const val SERVICE_CONNECT = "host:connect:"
+        const val SERVICE_DISCONNECT = "host:disconnect:"
+        val CONNECT_FAILURE_PREFIXES = listOf("unable to connect", "failed to connect", "no route to host")
         const val RETRY_DELAY_MILLIS = 1_500L
         const val START_SERVER_TIMEOUT_SECONDS = 10L
         const val READER_BUFFER_BYTES = 1 shl 16
 
         fun serviceTransport(serial: String) = "host:transport:$serial"
 
-        fun serviceLogcat(tailLines: Int?): String = buildString {
+        fun serviceLogcat(resumeFrom: String?): String = buildString {
             append("exec:logcat -v long,epoch")
-            if (tailLines != null) append(" -T ").append(tailLines)
+            if (resumeFrom != null) append(" -T ").append(resumeFrom)
         }
     }
 }
