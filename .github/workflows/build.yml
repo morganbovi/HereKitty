@@ -4,7 +4,9 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+    paths-ignore: ['mobile/**', 'relay/**', 'docs/**']
   pull_request:
+    paths-ignore: ['mobile/**', 'relay/**', 'docs/**']
   # So the whole pipeline can be exercised without cutting a real release. A dispatched run always
   # produces a draft.
   workflow_dispatch:
