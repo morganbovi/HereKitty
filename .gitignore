@@ -17,3 +17,9 @@ captures
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
+.env
+!.env.example
+google-services.json
+firebase-desktop.properties
+!firebase-desktop.properties.example
+docs/
