@@ -1,0 +1,5 @@
+# Docker Desktop smoke-test override. It never exposes the relay beyond this computer.
+services:
+  relay:
+    ports:
+      - "127.0.0.1:7050:7050"

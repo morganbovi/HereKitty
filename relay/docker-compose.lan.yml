@@ -1,0 +1,6 @@
+# Temporary same-LAN testing override. This publishes the relay to the current Wi-Fi network.
+# Keep this for trusted development networks only; Cloudflare Tunnel is the normal internet path.
+services:
+  relay:
+    ports:
+      - "7050:7050"

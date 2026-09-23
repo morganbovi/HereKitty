@@ -1,0 +1,21 @@
+# Home deployment: the relay is never exposed on the LAN or the internet directly — it has no
+# `ports:` mapping at all. cloudflared is the only ingress path, via an outbound-only connection
+# to Cloudflare's edge, so there is no inbound port to open, forward, or scan on this network.
+services:
+  relay:
+    build: .
+    restart: unless-stopped
+    environment:
+      # RELAY_AUTH_TOKEN was the pre-JWT name. Keep it as a local migration fallback so an
+      # existing deployment can adopt per-session tokens without ever exposing its secret.
+      RELAY_JWT_SECRET: ${RELAY_JWT_SECRET:-${RELAY_AUTH_TOKEN:?set RELAY_JWT_SECRET in .env}}
+    expose:
+      - "7050"
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    profiles: ["tunnel"]
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - relay
