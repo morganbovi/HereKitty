@@ -1,8 +1,4 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Pre-API-26 fallback: mipmap-anydpi-v26/ic_launcher.xml only applies from API 26, so a
-         plain mipmap/ic_launcher still needs to exist for older devices. Lint's ReferenceType
-         check expects a mipmap item to reference another mipmap, but aliasing a drawable this way
-         is the standard, working pattern -- there is no actual mipmap source to point at instead. -->
-    <item name="ic_launcher" type="mipmap" tools:ignore="ReferenceType">@drawable/herekitty_icon</item>
-    <item name="ic_launcher_round" type="mipmap" tools:ignore="ReferenceType">@drawable/herekitty_icon</item>
+<resources>
+    <item name="ic_launcher" type="mipmap">@drawable/herekitty_icon</item>
+    <item name="ic_launcher_round" type="mipmap">@drawable/herekitty_icon</item>
 </resources>
