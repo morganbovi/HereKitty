@@ -51,7 +51,12 @@ jobs:
                   "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
                   "android_client_info": { "package_name": "io.sweatshop.herekitty.mobile" }
                 },
-                "oauth_client": [],
+                "oauth_client": [
+                  {
+                    "client_id": "000000000000-ciplaceholder.apps.googleusercontent.com",
+                    "client_type": 3
+                  }
+                ],
                 "api_key": [{ "current_key": "ci-placeholder-key" }],
                 "services": { "appinvite_service": { "other_platform_oauth_client": [] } }
               }
