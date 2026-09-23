@@ -3,6 +3,7 @@ package io.sweatshop.herekitty.features.workspace
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import io.sweatshop.herekitty.domain.features.views.model.ViewConfig
 import io.sweatshop.herekitty.features.session.SessionContent
@@ -30,7 +31,9 @@ import org.koin.compose.koinInject
 fun WorkspaceContent(uiModel: WorkspaceUiModel, modifier: Modifier = Modifier) {
     val root = uiModel.activeRoot ?: return
     Box(modifier.fillMaxSize()) {
-        WorkspaceNodeContent(root, uiModel)
+        key(uiModel.activeTabId) {
+            WorkspaceNodeContent(root, uiModel)
+        }
     }
 }
 

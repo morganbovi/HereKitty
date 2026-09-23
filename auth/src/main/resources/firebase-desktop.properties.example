@@ -1,0 +1,22 @@
+# Copy to firebase-desktop.properties (gitignored) and fill in real values.
+#
+# apiKey is the herekitty-mobile Firebase project's Web API key -- not confidential, it's meant to
+# ship in client apps by design. Already known from google-services.json:
+apiKey=AIzaSyBx9PIwhkm6ffE_7RY4gTQS8Itckf1ylE0
+
+# From Google Cloud Console -> APIs & Services -> Credentials -> Create Credentials ->
+# OAuth client ID -> Application type: Desktop app, for the herekitty-mobile project.
+# A "Desktop app" client type is required (not the existing Web/Android ones from
+# google-services.json) because it's exempt from pre-registering every redirect URI --
+# an installed app can't know its ephemeral loopback port in advance.
+oauthClientId=
+oauthClientSecret=
+
+# Local-network test mode: point this at whichever machine on your LAN is running
+# `relay`'s ./gradlew runServer (its own local IP, not 127.0.0.1, unless the relay runs on this
+# same machine). Leave blank to disable the Relay card's live device grid / bridge health check
+# entirely -- there is no default that would work for every developer's network.
+relayHost=
+relayPort=7050
+# Production Cloudflare Tunnel endpoint. When set, this wins over relayHost/relayPort.
+# relayUrl=wss://relay.example.com

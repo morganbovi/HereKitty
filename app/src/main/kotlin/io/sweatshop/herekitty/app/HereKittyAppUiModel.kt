@@ -1,5 +1,6 @@
 package io.sweatshop.herekitty.app
 
+import io.sweatshop.herekitty.domain.features.auth.AuthState
 import io.sweatshop.herekitty.domain.features.devices.model.AdbServerState
 import io.sweatshop.herekitty.domain.features.settings.model.LogColumns
 import io.sweatshop.herekitty.domain.features.settings.model.ThemeMode
@@ -20,8 +21,11 @@ data class HereKittyAppUiModel(
     val serverState: AdbServerState,
     val deviceCount: Int,
     val isSettingsOpen: Boolean,
+    val authState: AuthState,
+    val isAdminScreenOpen: Boolean,
     val eventHandler: EventHandler<Event>,
 ) {
+    val showAdminEntry: Boolean get() = (authState as? AuthState.Authenticated)?.isAdmin == true
     val adbStatus: String
         get() = when (serverState) {
             is AdbServerState.Starting -> "adb starting"
@@ -57,5 +61,9 @@ data class HereKittyAppUiModel(
         data object OnSettingsOpened : Event
 
         data object OnSettingsDismissed : Event
+
+        data object OnAdminScreenOpened : Event
+
+        data object OnAdminScreenDismissed : Event
     }
 }

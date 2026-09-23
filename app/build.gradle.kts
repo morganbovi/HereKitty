@@ -19,6 +19,7 @@ kotlin {
 dependencies {
     api(project(":domain"))
     implementation(project(":injector"))
+    implementation(project(":net"))
 
     api(libs.compose.runtime)
     api(libs.compose.foundation)

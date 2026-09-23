@@ -45,10 +45,13 @@ compose.desktop {
             // against a release tag, suffix and all.
             packageVersion = installerVersionOf(project.version.toString())
 
-            // jpackage jlinks a minimal runtime, and these three are outside its default set. Without
-            // jdk.unsupported the packaged app dies at first paint on Jewel's use of sun.misc.Unsafe —
-            // which `run` never shows, because it uses the whole JDK. From `suggestRuntimeModules`.
-            modules("java.instrument", "java.naming", "jdk.unsupported")
+            // jpackage jlinks a minimal runtime, and these are outside its default set. Without
+            // jdk.unsupported the packaged app dies at first paint on Jewel's use of sun.misc.Unsafe;
+            // without jdk.httpserver, :auth's OAuth loopback callback server (com.sun.net.httpserver)
+            // dies with NoClassDefFoundError the moment sign-in is clicked — both invisible under
+            // `run`, which uses the whole JDK. From `suggestRuntimeModules`, rerun after adding a
+            // dependency that might reach a new part of the JDK.
+            modules("java.instrument", "java.management", "java.naming", "jdk.httpserver", "jdk.unsupported")
 
             // jpackage wants a different container per platform, all built from the same artwork.
             macOS {

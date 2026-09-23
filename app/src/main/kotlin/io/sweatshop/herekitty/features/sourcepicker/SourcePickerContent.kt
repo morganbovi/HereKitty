@@ -1,7 +1,9 @@
 package io.sweatshop.herekitty.features.sourcepicker
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,19 +25,29 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.sweatshop.herekitty.domain.features.auth.AuthState
 import io.sweatshop.herekitty.domain.features.devices.model.AdbDevice
 import io.sweatshop.herekitty.domain.features.logs.model.LastSessionInfo
 import io.sweatshop.herekitty.domain.features.logs.model.LogLevel
+import io.sweatshop.herekitty.features.relay.RelayCardPresenter
+import io.sweatshop.herekitty.features.relay.RelayCardUiModel
+import io.sweatshop.herekitty.features.relay.RelayDeviceGridContent
+import io.sweatshop.herekitty.features.relay.RelaySettingsPopup
 import io.sweatshop.herekitty.features.sourcepicker.SourcePickerUiModel.Event.OnCloseClicked
 import io.sweatshop.herekitty.features.sourcepicker.SourcePickerUiModel.Event.OnDeviceClicked
 import io.sweatshop.herekitty.features.sourcepicker.SourcePickerUiModel.Event.OnRecordingChosen
@@ -47,6 +59,7 @@ import io.sweatshop.herekitty.ui.format.formatCaptureDate
 import io.sweatshop.herekitty.ui.theme.colorFor
 import java.awt.Cursor
 import org.jetbrains.jewel.foundation.theme.JewelTheme
+import org.koin.compose.koinInject
 import org.jetbrains.jewel.ui.component.DefaultButton
 import org.jetbrains.jewel.ui.component.HorizontalProgressBar
 import org.jetbrains.jewel.ui.component.Icon
@@ -57,36 +70,55 @@ import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.typography
 
 @Composable
-fun SourcePickerContent(uiModel: SourcePickerUiModel, modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxSize()) {
-        if (uiModel.canClose) {
-            IconAction(
-                key = AllIconsKeys.General.Close,
-                description = "Close this split",
-                onClick = { uiModel.eventHandler(OnCloseClicked) },
-                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
-            )
-        }
+fun SourcePickerContent(
+    uiModel: SourcePickerUiModel,
+    modifier: Modifier = Modifier,
+    relayPresenter: RelayCardPresenter = koinInject(),
+) {
+    val relayUiModel = relayPresenter.present(
+        onDeviceBridged = { uiModel.eventHandler(OnDeviceClicked(it)) },
+    )
 
-        BoxWithConstraints(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .widthIn(max = CONTENT_MAX_WIDTH)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-        ) {
-            // Three cards side by side once there is room for them; stacked otherwise, so a narrow
-            // split still gets the full picture instead of squeezed, unreadable columns.
-            if (maxWidth < CARDS_ROW_MIN_WIDTH) {
-                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SourceCards(uiModel, Modifier.fillMaxWidth())
+    Crossfade(targetState = relayUiModel.isBrowsing, modifier = modifier.fillMaxSize()) { browsing ->
+        if (browsing) {
+            RelayDeviceGridContent(relayUiModel, Modifier.fillMaxSize())
+        } else {
+            Box(Modifier.fillMaxSize()) {
+                if (uiModel.canClose) {
+                    IconAction(
+                        key = AllIconsKeys.General.Close,
+                        description = "Close this split",
+                        onClick = { uiModel.eventHandler(OnCloseClicked) },
+                        modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
+                    )
                 }
-            } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .widthIn(max = CONTENT_MAX_WIDTH)
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
                 ) {
-                    SourceCards(uiModel, Modifier.weight(1f).fillMaxHeight())
+                    // Four cards in a 2x2 grid once there is room for them; stacked otherwise, so a
+                    // narrow split still gets the full picture instead of squeezed, unreadable columns.
+                    if (maxWidth < CARDS_ROW_MIN_WIDTH) {
+                        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            SourceCards(uiModel, relayUiModel, Modifier.fillMaxWidth())
+                        }
+                    } else {
+                        val cards = sourceCardSlots(uiModel, relayUiModel)
+                        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            cards.chunked(2).forEach { row ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    row.forEach { card -> card(Modifier.weight(1f).fillMaxHeight()) }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -98,18 +130,28 @@ fun SourcePickerContent(uiModel: SourcePickerUiModel, modifier: Modifier = Modif
  * row, `fillMaxWidth()` stacked), so the two arrangements cannot drift apart from each other.
  */
 @Composable
-private fun SourceCards(uiModel: SourcePickerUiModel, cardModifier: Modifier) {
-    if (uiModel.lastSessions.isNotEmpty()) LastSessionCard(uiModel, cardModifier)
-    DeviceCard(uiModel, cardModifier)
-    OpenFileCard(uiModel, cardModifier)
+private fun SourceCards(uiModel: SourcePickerUiModel, relayUiModel: RelayCardUiModel, cardModifier: Modifier) {
+    sourceCardSlots(uiModel, relayUiModel).forEach { card -> card(cardModifier) }
+}
+
+@Composable
+private fun sourceCardSlots(
+    uiModel: SourcePickerUiModel,
+    relayUiModel: RelayCardUiModel,
+): List<@Composable (Modifier) -> Unit> = buildList {
+    if (uiModel.lastSessions.isNotEmpty()) add { m -> LastSessionCard(uiModel, m) }
+    add { m -> DeviceCard(uiModel, m) }
+    add { m -> OpenFileCard(uiModel, m) }
+    add { m -> RelayCard(relayUiModel, m) }
 }
 
 @Composable
 private fun SourceCard(
-    icon: IconKey,
+    icon: IconKey?,
     title: String,
     subtitle: String?,
     modifier: Modifier = Modifier,
+    iconContent: @Composable (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
@@ -141,7 +183,7 @@ private fun SourceCard(
                     .background(JewelTheme.globalColors.outlines.focused.copy(alpha = 0.16f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(key = icon, contentDescription = null)
+                iconContent?.invoke() ?: Icon(key = requireNotNull(icon), contentDescription = null)
             }
 
             Text(title, style = JewelTheme.typography.regular, fontWeight = FontWeight.Bold)
@@ -390,6 +432,109 @@ private fun OpenFileCard(uiModel: SourcePickerUiModel, modifier: Modifier = Modi
                 color = JewelTheme.globalColors.text.info,
             )
         }
+    }
+}
+
+@Composable
+private fun RelayCard(uiModel: RelayCardUiModel, modifier: Modifier = Modifier) {
+    val state = uiModel.authState
+    var isSettingsOpen by remember { mutableStateOf(false) }
+
+    Box(modifier) {
+        SourceCard(
+            icon = null,
+            title = "Relay",
+            subtitle = "Use shared Android devices from anywhere.",
+            modifier = Modifier.fillMaxSize(),
+            iconContent = { RelayMark() },
+        ) {
+            if (uiModel.relayReachable == false) {
+                Text(
+                    text = "Relay service unavailable",
+                    style = JewelTheme.typography.small,
+                    color = colorFor(LogLevel.WARN),
+                    textAlign = TextAlign.Center,
+                )
+            }
+            when (state) {
+                is AuthState.Authenticated -> Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    if (uiModel.orgId == null) {
+                        Text(
+                            text = "Not assigned to an org yet.",
+                            style = JewelTheme.typography.small,
+                            color = JewelTheme.globalColors.text.info,
+                            textAlign = TextAlign.Center,
+                        )
+                    } else {
+                        val onlineCount = uiModel.devices.count { it.isOnline }
+                        Text(
+                            text = if (uiModel.isLoadingDevices) "Checking devices…" else "$onlineCount device${if (onlineCount == 1) "" else "s"} online",
+                            style = JewelTheme.typography.small,
+                            color = JewelTheme.globalColors.text.info,
+                        )
+                        DefaultButton(onClick = { uiModel.eventHandler(RelayCardUiModel.Event.OnBrowseClicked) }) {
+                            Text("Use Relay")
+                        }
+                    }
+                }
+
+                else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    DefaultButton(
+                        enabled = !uiModel.isSigningIn,
+                        onClick = { uiModel.eventHandler(RelayCardUiModel.Event.OnSignInClicked) },
+                    ) {
+                        Text(if (uiModel.isSigningIn) "Signing in…" else "Sign in with Google")
+                    }
+                    uiModel.error?.let { message ->
+                        Text(
+                            text = message,
+                            style = JewelTheme.typography.small,
+                            color = colorFor(LogLevel.ERROR),
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
+            }
+        }
+
+        if (state is AuthState.Authenticated) {
+            Box(modifier = Modifier.align(Alignment.TopEnd)) {
+                IconAction(
+                    key = AllIconsKeys.General.Settings,
+                    description = "Relay settings",
+                    onClick = { isSettingsOpen = true },
+                    modifier = Modifier.padding(4.dp),
+                )
+                if (isSettingsOpen) {
+                    RelaySettingsPopup(
+                        signedInAs = state.displayName.ifBlank { state.email },
+                        onSignOutClicked = { uiModel.eventHandler(RelayCardUiModel.Event.OnSignOutClicked) },
+                        onDismissRequest = { isSettingsOpen = false },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RelayMark() {
+    val accent = JewelTheme.globalColors.outlines.focused
+    Canvas(Modifier.size(26.dp)) {
+        val hub = center
+        val points = listOf(
+            androidx.compose.ui.geometry.Offset(size.width * 0.2f, size.height * 0.3f),
+            androidx.compose.ui.geometry.Offset(size.width * 0.8f, size.height * 0.3f),
+            androidx.compose.ui.geometry.Offset(size.width * 0.5f, size.height * 0.82f),
+        )
+        points.forEach { point ->
+            drawLine(accent, hub, point, strokeWidth = size.minDimension * 0.075f)
+            drawCircle(accent, radius = size.minDimension * 0.14f, center = point, style = Stroke(size.minDimension * 0.07f))
+        }
+        drawCircle(accent, radius = size.minDimension * 0.18f, center = hub)
     }
 }
 

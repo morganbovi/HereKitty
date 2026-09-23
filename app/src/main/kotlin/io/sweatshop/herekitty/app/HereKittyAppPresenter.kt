@@ -1,11 +1,14 @@
 package io.sweatshop.herekitty.app
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnAdminScreenDismissed
+import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnAdminScreenOpened
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnCheckForUpdatesOnStartupChanged
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnCompactViewToggled
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnConfirmExitChanged
@@ -19,6 +22,7 @@ import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnSelectMessageOnlyC
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnSettingsDismissed
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnSettingsOpened
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnThemeModeChanged
+import io.sweatshop.herekitty.domain.features.auth.AuthRepository
 import io.sweatshop.herekitty.domain.features.devices.repository.DeviceRepository
 import io.sweatshop.herekitty.domain.features.settings.repository.SettingsRepository
 import io.sweatshop.herekitty.ui.presenter.EventHandler
@@ -28,9 +32,11 @@ import org.koin.core.annotation.Factory
 class HereKittyAppPresenter(
     private val settingsRepository: SettingsRepository,
     private val deviceRepository: DeviceRepository,
+    private val authRepository: AuthRepository,
 ) {
     @Composable
     fun present(): HereKittyAppUiModel {
+        val authState by authRepository.authState.collectAsState()
         val themeMode by settingsRepository.themeMode.collectAsState()
         val logColumns by settingsRepository.logColumns.collectAsState()
         val logFontScale by settingsRepository.logFontScale.collectAsState()
@@ -46,6 +52,9 @@ class HereKittyAppPresenter(
         val devices by deviceRepository.devices.collectAsState()
 
         var isSettingsOpen by remember { mutableStateOf(false) }
+        var isAdminScreenOpen by remember { mutableStateOf(false) }
+
+        LaunchedEffect(Unit) { authRepository.restoreSession() }
 
         return HereKittyAppUiModel(
             themeMode = themeMode,
@@ -62,6 +71,8 @@ class HereKittyAppPresenter(
             serverState = serverState,
             deviceCount = devices.size,
             isSettingsOpen = isSettingsOpen,
+            authState = authState,
+            isAdminScreenOpen = isAdminScreenOpen,
             eventHandler = EventHandler { event ->
                 when (event) {
                     is OnThemeModeChanged -> settingsRepository.setThemeMode(event.mode)
@@ -80,6 +91,8 @@ class HereKittyAppPresenter(
                         settingsRepository.setNotificationDismissSeconds(event.seconds)
                     OnSettingsOpened -> isSettingsOpen = true
                     OnSettingsDismissed -> isSettingsOpen = false
+                    OnAdminScreenOpened -> isAdminScreenOpen = true
+                    OnAdminScreenDismissed -> isAdminScreenOpen = false
                 }
             },
         )

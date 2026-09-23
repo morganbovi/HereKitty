@@ -14,6 +14,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.sweatshop.herekitty.features.admin.AdminContent
+import io.sweatshop.herekitty.features.admin.AdminPresenter
 import io.sweatshop.herekitty.features.settings.SettingsWindow
 import io.sweatshop.herekitty.features.workspace.WorkspaceContent
 import io.sweatshop.herekitty.features.workspace.WorkspacePresenter
@@ -23,6 +25,8 @@ import io.sweatshop.herekitty.features.workspace.WorkspaceUiModel.Event.OnNewTab
 import io.sweatshop.herekitty.features.workspace.WorkspaceUiModel.Event.OnNoticeDismissed
 import io.sweatshop.herekitty.features.workspace.WorkspaceUiModel.Event.OnTabClosed
 import io.sweatshop.herekitty.features.workspace.WorkspaceUiModel.Event.OnTabSelected
+import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnAdminScreenDismissed
+import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnAdminScreenOpened
 import io.sweatshop.herekitty.app.HereKittyAppUiModel.Event.OnSettingsOpened
 import io.sweatshop.herekitty.features.updates.UpdateBalloon
 import io.sweatshop.herekitty.features.updates.UpdatePresenter
@@ -48,6 +52,7 @@ import org.koin.compose.koinInject
 fun HereKittyApp(
     presenter: HereKittyAppPresenter = koinInject(),
     workspacePresenter: WorkspacePresenter = koinInject(),
+    adminPresenter: AdminPresenter = koinInject(),
     titleBar: @Composable (HereKittyAppUiModel) -> Unit = {},
     settingsRequests: Flow<Unit> = emptyFlow(),
     onExitApplication: () -> Unit = {},
@@ -55,6 +60,7 @@ fun HereKittyApp(
 ) {
     val uiModel = presenter.present()
     val workspaceUiModel = workspacePresenter.present()
+    val adminUiModel = adminPresenter.present(onClose = { uiModel.eventHandler(OnAdminScreenDismissed) })
     val updateUiModel = updatePresenter.present(onExitApplication)
 
     // The platform menu bar can ask for settings too, from outside the composition.
@@ -72,10 +78,21 @@ fun HereKittyApp(
                 // Only the window's own title bar survives compact view; everything this app draws
                 // itself, starting with the tab strip, goes to leave nothing but log content.
                 if (!uiModel.isCompactView) {
-                    TabBar(workspaceUiModel)
+                    TabBar(
+                        uiModel = workspaceUiModel,
+                        showAdminEntry = uiModel.showAdminEntry,
+                        isAdminScreenOpen = uiModel.isAdminScreenOpen,
+                        onAdminClicked = { uiModel.eventHandler(OnAdminScreenOpened) },
+                        onRealTabInteraction = { uiModel.eventHandler(OnAdminScreenDismissed) },
+                    )
                     Divider(Orientation.Horizontal)
                 }
-                WorkspaceContent(workspaceUiModel, Modifier.weight(1f))
+                Box(Modifier.weight(1f)) {
+                    WorkspaceContent(workspaceUiModel, Modifier.fillMaxSize())
+                    if (uiModel.isAdminScreenOpen) {
+                        AdminContent(adminUiModel, Modifier.fillMaxSize())
+                    }
+                }
             }
 
             Column(
@@ -99,17 +116,39 @@ fun HereKittyApp(
 }
 
 @Composable
-private fun TabBar(uiModel: WorkspaceUiModel) {
+private fun TabBar(
+    uiModel: WorkspaceUiModel,
+    showAdminEntry: Boolean,
+    isAdminScreenOpen: Boolean,
+    onAdminClicked: () -> Unit,
+    onRealTabInteraction: () -> Unit,
+) {
     // The add button rides along as a trailing tab. TabStrip always fills its width — its scrollbar
     // is fillMaxWidth inside — so a sibling button can only ever end up pinned to the far right.
     val titles = uiModel.tabTitles
 
-    val tabs = uiModel.tabs.mapIndexed { index, tab ->
+    val adminTab = if (showAdminEntry) {
+        listOf(
+            TabData.Editor(
+                selected = isAdminScreenOpen,
+                closable = false,
+                onClick = onAdminClicked,
+                content = { Text("Admin", maxLines = 1, softWrap = false) },
+            ),
+        )
+    } else {
+        emptyList()
+    }
+
+    val tabs = adminTab + uiModel.tabs.mapIndexed { index, tab ->
         TabData.Editor(
-            selected = tab.id == uiModel.activeTabId,
+            selected = !isAdminScreenOpen && tab.id == uiModel.activeTabId,
             closable = uiModel.canCloseTabs,
             onClose = { uiModel.eventHandler(OnTabClosed(tab.id)) },
-            onClick = { uiModel.eventHandler(OnTabSelected(tab.id)) },
+            onClick = {
+                onRealTabInteraction()
+                uiModel.eventHandler(OnTabSelected(tab.id))
+            },
             content = {
                 Text(
                     text = titles.getOrElse(index) { WorkspaceTab.UNNAMED_TITLE },
@@ -123,7 +162,10 @@ private fun TabBar(uiModel: WorkspaceUiModel) {
     } + TabData.Editor(
         selected = false,
         closable = false,
-        onClick = { uiModel.eventHandler(OnNewTabClicked) },
+        onClick = {
+            onRealTabInteraction()
+            uiModel.eventHandler(OnNewTabClicked)
+        },
         content = {
             Tooltip(tooltip = { Text(NEW_TAB_DESCRIPTION) }) {
                 Icon(AllIconsKeys.General.Add, contentDescription = NEW_TAB_DESCRIPTION)
