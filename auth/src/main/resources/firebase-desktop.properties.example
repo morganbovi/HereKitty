@@ -1,8 +1,8 @@
 # Copy to firebase-desktop.properties (gitignored) and fill in real values.
 #
-# apiKey is the herekitty-mobile Firebase project's Web API key -- not confidential, it's meant to
-# ship in client apps by design. Already known from google-services.json:
-apiKey=AIzaSyBx9PIwhkm6ffE_7RY4gTQS8Itckf1ylE0
+# apiKey is the herekitty-mobile Firebase project's Web API key -- copy it out of
+# mobile/app/google-services.json (client[0].api_key[0].current_key), gitignored, not this repo.
+apiKey=
 
 # From Google Cloud Console -> APIs & Services -> Credentials -> Create Credentials ->
 # OAuth client ID -> Application type: Desktop app, for the herekitty-mobile project.
