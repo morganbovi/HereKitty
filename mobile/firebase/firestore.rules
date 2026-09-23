@@ -1,0 +1,44 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function tokenOrgId() {
+      return request.auth.token.orgId;
+    }
+    function isOrgMember(requestedOrgId) {
+      return isSignedIn() && tokenOrgId() == requestedOrgId;
+    }
+
+    match /orgs/{orgId} {
+      allow read: if isOrgMember(orgId);
+      // Org docs themselves are Cloud-Function/admin-console managed, never direct client writes.
+      allow write: if false;
+
+      match /members/{uid} {
+        allow read: if isOrgMember(orgId);
+        // Membership is only ever written by the assignUserToOrg Cloud Function (Admin SDK,
+        // bypasses rules) after checking the caller's isAdmin claim server-side. A client that
+        // could write this directly could grant itself membership -- never allow it.
+        allow write: if false;
+      }
+
+      match /devices/{deviceId} {
+        // Any org member can see the org's shared devices.
+        allow read: if isOrgMember(orgId);
+        allow create: if isOrgMember(orgId)
+          && request.resource.data.ownerId == request.auth.uid
+          && request.resource.data.keys().hasAll(['ownerId','ownerDisplayName','name','model','installId','isShared'])
+          && request.resource.data.name is string
+          && request.resource.data.isShared is bool;
+        // Ownership can never change via a client update -- only the current owner may write,
+        // and the owner field itself must stay the same.
+        allow update: if isOrgMember(orgId)
+          && resource.data.ownerId == request.auth.uid
+          && request.resource.data.ownerId == resource.data.ownerId;
+        allow delete: if isOrgMember(orgId) && resource.data.ownerId == request.auth.uid;
+      }
+    }
+  }
+}

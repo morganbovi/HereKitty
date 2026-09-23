@@ -1,0 +1,16 @@
+{
+  "rules": {
+    "presence": {
+      "$deviceId": {
+        ".read": "auth != null && auth.token.orgId != null",
+        ".write": "auth != null && auth.token.orgId != null"
+      }
+    },
+    "sessions": {
+      "$deviceId": {
+        ".read": "auth != null && auth.token.orgId != null",
+        ".write": "auth != null && auth.token.orgId != null"
+      }
+    }
+  }
+}
