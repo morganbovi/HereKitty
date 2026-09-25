@@ -73,6 +73,15 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
 
+      # firebase-desktop.properties is gitignored -- real OAuth/Firebase config, never committed --
+      # so a fresh checkout has none. Without this, :auth silently ships with nothing configured and
+      # Sign in with Google fails for everyone who runs the built app. Written from a secret rather
+      # than committed, same reasoning as everything else in :auth.
+      - shell: bash
+        env:
+          FIREBASE_DESKTOP_PROPERTIES: ${{ secrets.FIREBASE_DESKTOP_PROPERTIES }}
+        run: printf '%s' "$FIREBASE_DESKTOP_PROPERTIES" > auth/src/main/resources/firebase-desktop.properties
+
       # jpackage shells out to WiX for an .msi and fails without it. WiX 3.11 rather than 4/5 because
       # it is the version jpackage has supported longest.
       - if: runner.os == 'Windows'

@@ -21,8 +21,48 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      # The action's own default packages list ("tools platform-tools") includes the legacy
+      # "tools" package, which Google removed from the SDK repository years ago -- sdkmanager
+      # exits 1 trying to fetch it. AGP downloads build-tools/platforms itself once licenses are
+      # accepted, so platform-tools alone is what this step actually needs to provide.
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - uses: gradle/actions/setup-gradle@v6
+
+      # google-services.json holds real Firebase project config and is gitignored on purpose --
+      # never committed, so CI never has it. The Google Services plugin hard-requires the file to
+      # exist to run at all, even though nothing in `./gradlew build` (compile, lint, unit tests)
+      # actually talks to Firebase, so a syntactically-valid placeholder is enough to satisfy it.
+      - name: Write a placeholder google-services.json for the build
+        run: |
+          mkdir -p mobile/app
+          cat > mobile/app/google-services.json <<'EOF'
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "herekitty-ci-placeholder",
+              "storage_bucket": "herekitty-ci-placeholder.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
+                  "android_client_info": { "package_name": "io.sweatshop.herekitty.mobile" }
+                },
+                "oauth_client": [
+                  {
+                    "client_id": "000000000000-ciplaceholder.apps.googleusercontent.com",
+                    "client_type": 3
+                  }
+                ],
+                "api_key": [{ "current_key": "ci-placeholder-key" }],
+                "services": { "appinvite_service": { "other_platform_oauth_client": [] } }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
 
       - run: cd mobile && ./gradlew build --stacktrace
